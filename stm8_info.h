@@ -173,6 +173,16 @@ static char swim_rvc_ack(swim_priv_t* priv){
 static swim_handle_t swim_send_unit(swim_priv_t* priv, unsigned char data, unsigned char len, unsigned i
 #endif
 
+typedef struct APP_WITH_KERNEL{
+	unsigned int prescal;
+	unsigned int entire_cys;
+	unsigned int act_cys;
+
+	unsigned int pulse_state;
+	unsigned int pulse_width;
+}communication_info_t;
+
+
 #define STM8_SWIM_DEVICE_NAME "swim"
 #define SWIM_CMD_LEN                    3
 #define SWIM_CMD_SRST                   0x00
@@ -180,7 +190,12 @@ static swim_handle_t swim_send_unit(swim_priv_t* priv, unsigned char data, unsig
 #define SWIM_CMD_WOTF                   0x02
 
 #define SWIM_MAX_RESEND_CNT             20
+#define A83T_IOCTL_MAGIC 'H'
 #define SWIM_IOCTL_RESET 				1
+#define A83T_PWM_DUTY_CYCLE_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 0, communication_info_t)
+#define A83T_PWM_PULSE_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 1, communication_info_t)
+
+
 
 #define SWIM_CSR_ADDR 					0x00007F80
 

@@ -237,9 +237,7 @@ static void pwm_free_iomem(swim_priv_t* priv){
  * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
  * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
 */
-static inline int pwm_pin_set(swim_priv_t* priv, unsigned char* pin_name, unsigned int enable, unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
-	unsigned long val = 0;
-
+static inline int pwm_reg_set(swim_priv_t* priv, unsigned char* pin_name, unsigned int enable, unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
 	if('8' == pin_name[3]){
 		if(!enable){
 			reg_writel(0x0<<PWM_CH0_EN_POS, priv->pwm_ch_ctrl);
@@ -248,7 +246,7 @@ static inline int pwm_pin_set(swim_priv_t* priv, unsigned char* pin_name, unsign
 			
 			reg_writel(0x0<<PWM_CH0_EN_POS, priv->pwm_ch_ctrl);
 			reg_writel(((entire_cys&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((act_cys&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), priv->pwm_ch0_period);
-			reg_writel((0x1<<PWM0_BYPASS_POS) | (0x1<<PWM_CH0_ACT_STA_POS) | ((prescal&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS), priv->pwm_ch_ctrl);
+			reg_writel((0x0<<PWM0_BYPASS_POS) | (0x1<<PWM_CH0_ACT_STA_POS) | ((prescal&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS), priv->pwm_ch_ctrl);
 			reg_writel(reg_readl(priv->pwm_ch_ctrl) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), priv->pwm_ch_ctrl);
 			
 		}
@@ -257,7 +255,7 @@ static inline int pwm_pin_set(swim_priv_t* priv, unsigned char* pin_name, unsign
 	return 0;
 }
 
-static inline int pwm_pin_get(swim_priv_t* priv, unsigned char* pin_name, unsigned int enable, unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
+static inline int pwm_reg_get(swim_priv_t* priv, unsigned char* pin_name, unsigned int enable, unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
 
 	if('8' == pin_name[3]){
 		
@@ -271,6 +269,54 @@ static inline int pwm_pin_get(swim_priv_t* priv, unsigned char* pin_name, unsign
 
 	return 0;
 }
+
+/* because the prescale val is 0xf, so PWM CLK equals to 24MHz/1 as 24MHz
+ * 
+*/
+static inline void pwm_waveform_set(swim_priv_t* priv, unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
+
+	pwm_reg_set(priv, PWM, 1, prescal, entire_cys, act_cys);
+}
+static void pwm_send_bit(swim_priv_t* priv, unsigned char bit){
+    // way at low speed
+    if(bit){
+        swim_pin_output(priv, SWIM, LOW);
+        a83t_ndelay(priv, 250); // 2*(1/8M) = 250ns
+        swim_pin_output(priv, SWIM, HIGH);
+        a83t_ndelay(priv, 2500); // 20*(1/8M) = 2500ns
+    }
+    else{
+        swim_pin_output(priv, SWIM, LOW);
+        a83t_ndelay(priv, 2500); // 2*(1/8M) = 2500ns
+        swim_pin_output(priv, SWIM, HIGH);
+        a83t_ndelay(priv, 250); // 20*(1/8M) = 250ns
+    }
+}
+
+/* After the pulse is finished, the bit(PWM_CH0_PUL_START_POS) will be cleared automatically.
+ * pulse_state: 0:low_level, 1:high_level
+ * pulse_width:
+ * 
+*/
+static inline int pwm_pulse_set(swim_priv_t* priv, unsigned char* pin_name, unsigned int enable, unsigned int prescal, unsigned int pulse_state, unsigned int pulse_width){
+
+	if('8' == pin_name[3]){
+		if(!enable){
+			reg_writel(0x0<<PWM_CH0_EN_POS, priv->pwm_ch_ctrl);
+			return 0;
+		}else{
+			
+			reg_writel(0x0<<PWM_CH0_EN_POS, priv->pwm_ch_ctrl);
+			reg_writel((pulse_width&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS, priv->pwm_ch0_period);
+			reg_writel((0x0<<PWM0_BYPASS_POS) | (0x1<<PWM_CHANNEL0_MODE_POS) | (pulse_state<<PWM_CH0_ACT_STA_POS) | ((prescal&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS), priv->pwm_ch_ctrl);
+			reg_writel(reg_readl(priv->pwm_ch_ctrl) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), priv->pwm_ch_ctrl);
+			
+		}
+	}
+
+	return 0;
+}
+
 
 static void swim_send_bit(swim_priv_t* priv, unsigned char bit){
     // way at low speed
@@ -647,14 +693,13 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	//3. get swim_pin iomap
 	if(!swim_get_iomem(priv))return -ENOMEM;
 	if(!pwm_get_iomem(priv))return -ENOMEM;
-
-
 	swim_pin_set(priv, PWM, 0x2, 0, 0, 0);
 
 
 	//swim_start_entry(priv);
-	pwm_pin_set(priv, PWM, 1, 0xf, 0xfff, 0xeff);
-	pwm_pin_get(priv, PWM, 0, 0, 0, 0);
+
+	
+
 	
 	hensen_debug();
 	return 0;
@@ -786,13 +831,45 @@ static long a83t_swim_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 }
 
 
+
+static long hensen_pwm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
+    swim_handle_t ret = 0;
+	swim_priv_t * priv = filp->private_data;
+	communication_info_t* info = (communication_info_t*)arg;
+	communication_info_t* t;
+	
+	if(A83T_IOCTL_MAGIC != _IOC_TYPE(cmd)){
+		printk(KERN_ERR "unlocked_ioctl error!\n");
+		return -EINVAL;
+	}
+	
+    switch(_IOC_NR(cmd)){
+        case 0:
+			hensen_debug("prescal:%#x\n", info->prescal);
+			pwm_waveform_set(priv, info->prescal, info->entire_cys, info->act_cys);
+			pwm_reg_get(priv, PWM, 1, 0, 0, 0);
+            break;
+		case 1:
+			pwm_pulse_set(priv, PWM, 1, info->prescal, info->pulse_state, info->pulse_width);
+			pwm_reg_get(priv, PWM, 1, 0, 0, 0);
+			break;
+        default:
+        	hensen_debug("Error: unlocked_ioctl!\n");
+            break;
+    }
+
+    return ret;
+}
+
+
 static struct file_operations stm8_swim_fops = {
 	.open = stm8_swim_open,
 	.release = stm8_swim_release,
     .write          = a83t_swim_write,
     .read           = a83t_swim_read,
     .llseek         = a83t_swim_seek,
-    .unlocked_ioctl = a83t_swim_ioctl,
+//    .unlocked_ioctl = a83t_swim_ioctl,
+    .unlocked_ioctl = hensen_pwm_ioctl,
 };
 	
 static struct miscdevice stm8_swim_misc = {
