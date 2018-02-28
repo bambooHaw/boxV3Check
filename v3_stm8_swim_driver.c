@@ -73,6 +73,7 @@ static void __iomem* timer0_get_iomem(swim_priv_t* priv){
 	priv->tmr_base_vaddr = vaddr;
 	priv->tmr_0_ctrl = vaddr + TMR_0_CTRL_OFF;
 	priv->tmr_0_intv = vaddr + TMR_0_INTV_OFF;
+	priv->tmr_0_current = vaddr + TMR_0_CURRENT_OFF;
 	
 	return vaddr;
 }
@@ -87,22 +88,46 @@ static void timer0_free_iomem(swim_priv_t* priv){
 /* 
  * by Hensen 2018
  */
-static inline void a83t_ndelay(swim_priv_t * priv, unsigned int ns){
+static void a83t_ndelay(swim_priv_t * priv, unsigned int ns){
 
-	unsigned long tcnt;
+	unsigned int tcnt;
 
 	// osc = 24MHz, min valid delay = 41.667ns, tcnt  = ns * (pclk / 100000) / 10000;
 	if(ns<42)ns=42;
 	tcnt  = ns*24/1000;
 
-	writel(tcnt, priv->tmr_0_intv);									//Set interval value
-	writel(0x84, priv->tmr_0_ctrl);									//Select single mode, 24MHz clock source, 1 pre-scale
-	writel(readl(priv->tmr_0_ctrl)|(1<<1), priv->tmr_0_ctrl);		//Set Reload bit
-	while((readl(priv->tmr_0_ctrl)>>1) & 1);						//Waiting reload bit turns to 0
-	writel(readl(priv->tmr_0_ctrl)|(1<<0), priv->tmr_0_ctrl); 		//Enable timer0
+	reg_writel(tcnt, priv->tmr_0_intv);									//Set interval value
+	reg_writel(0x84, priv->tmr_0_ctrl);									//Select single mode, 24MHz clock source, 1 pre-scale
+	reg_writel(reg_readl(priv->tmr_0_ctrl)|(1<<1), priv->tmr_0_ctrl);		//Set Reload bit
+	while((reg_readl(priv->tmr_0_ctrl)>>1) & 1);						//Waiting reload bit turns to 0
+	writel(reg_readl(priv->tmr_0_ctrl)|(1<<0), priv->tmr_0_ctrl); 		//Enable timer0
 }
 
-static inline void a83t_udelay(swim_priv_t* priv, unsigned int us){
+static void timer0_start_timing(void){
+//	unsigned int cnt;
+
+	// osc = 24MHz, min valid delay = 41.667ns, 
+
+	reg_writel(0xefffffff, pp->tmr_0_intv);									//Set interval value
+	reg_writel(0x84, pp->tmr_0_ctrl);									//Select single mode, 24MHz clock source, 1 pre-scale
+	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<1), pp->tmr_0_ctrl);		//Set Reload bit
+	while((reg_readl(pp->tmr_0_ctrl)>>1) & 1);						//Waiting reload bit turns to 0
+//	hensen_debug("timer0 start val: %d\n", reg_readl(pp->tmr_0_current));
+	writel(reg_readl(pp->tmr_0_ctrl)|(1<<0), pp->tmr_0_ctrl); 		//Enable timer0
+}
+
+static void timer0_get_time(void){
+	register unsigned int cnt;
+
+	writel(reg_readl(pp->tmr_0_ctrl)& (~(1<<0)), pp->tmr_0_ctrl); 		//Disable timer0	
+	cnt = reg_readl(pp->tmr_0_current);
+	cnt = 0xefffffff - cnt;
+	hensen_debug("Timing cnt: %d\n", cnt);
+	
+	cnt = (cnt * 1000) / 24;
+	hensen_debug("Total time: %d(ns)\n", cnt);
+}
+static void a83t_udelay(swim_priv_t* priv, unsigned int us){
 	while(us--)
 		a83t_ndelay(priv, 1000);
 }
@@ -146,16 +171,7 @@ static inline int swim_pin_set(swim_priv_t* priv, unsigned char* pin_name, unsig
 	spin_lock_irqsave(&priv->spinlock, priv->irqflags);
 	
 	//8->PWM, 7 -> SWIM, 6 -> RST, strcmp spend 200ns, not recommend
-	
-	if('8' == pin_name[3]){
-		reg_writel((reg_readl(priv->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (func << PD28_SELECT_POS), priv->pd_cfg3_reg);
-		reg_writel((reg_readl(priv->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (data << PD28_DATA_POS), priv->pd_data_reg);
-		reg_writel((reg_readl(priv->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (drv << PD28_DRV_POS), priv->pd_drv1_reg);
-		reg_writel((reg_readl(priv->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (pull << PD28_PULL_POS), priv->pd_pull1_reg);
 
-		spin_unlock_irqrestore(&priv->spinlock, priv->irqflags);
-		return 0;
-	}
 	if('7' == pin_name[3]){
 		reg_writel((reg_readl(priv->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (func << PD27_SELECT_POS), priv->pd_cfg3_reg);
 		reg_writel((reg_readl(priv->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (data << PD27_DATA_POS), priv->pd_data_reg);
@@ -183,40 +199,6 @@ static inline int swim_pin_set(swim_priv_t* priv, unsigned char* pin_name, unsig
 }
 
 
-/*  by Hensen 2018.  //TO save time so no val check, please care about for that.
-	name: port name, eg. PG6, PG7, PG8...
-	func: multi sel val: 0 - input, 1 - output... 
-	pull:  pull val: 0 - pull up/down disable, 1 - pull up... , 2-pull down
-	drv: driver level val: 0 - level 0, 1 - level 1...
-	data: data val: 0 - low, 1 - high, only vaild when mul_sel is input/output
-*/
-
-static inline void swim_pin_high(void){
-
-	//func ,0x1, output
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	//date, 0x1
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
-	//drv level 0x3
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x3 << PD27_DRV_POS), pp->pd_drv1_reg);
-	//pull 0x1 pull up
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x1 << PD27_PULL_POS), pp->pd_pull1_reg);
-
-}
-static inline void swim_pin_low(void){
-
-	//func ,0x1, output
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	//date, 0x0
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
-	//drv level 0x0
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x0 << PD27_DRV_POS), pp->pd_drv1_reg);
-	//pull 0x2 pull up
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x2 << PD27_PULL_POS), pp->pd_pull1_reg);
-
-}
-
-
 
 static inline int swim_pin_input(swim_priv_t* priv, unsigned char* pin_name){
 	swim_pin_set(priv, pin_name, 0, 0, 0, 0);
@@ -241,6 +223,73 @@ static inline int swim_pin_output(swim_priv_t * priv, unsigned char * pin_name, 
 
 }
 
+static void pd27_set_as_output_high(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x3 << PD27_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x1 << PD27_PULL_POS), pp->pd_pull1_reg);
+	return;
+}
+static void pd27_set_as_output_low(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x0 << PD27_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x2 << PD27_PULL_POS), pp->pd_pull1_reg);
+	return;
+}
+
+static void pd27_set_as_input(void){
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x0 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x0 << PD27_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x0 << PD27_PULL_POS), pp->pd_pull1_reg);
+	return;
+}
+
+static unsigned int pd27_get_input_val(void){
+	
+	return ((reg_readl(pp->pd_data_reg)>>PD27_DATA_POS) & 0x1);
+}
+
+static void pd26_set_as_output_high(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x1 << PD26_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x3<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x1 << PD26_PULL_POS), pp->pd_pull1_reg);	
+
+	return;
+}
+
+static void pd26_set_as_output_low(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x2 << PD26_PULL_POS), pp->pd_pull1_reg);	
+
+	return;
+}
+
+static void pd26_set_as_input(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x0 << PD26_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x0 << PD26_PULL_POS), pp->pd_pull1_reg);	
+
+	return;
+}
+
+static unsigned int pd26_get_input_val(void){
+	
+	return ((reg_readl(pp->pd_data_reg)>>PD26_DATA_POS) & 0x1);
+}
+
+
+
 
 static void __iomem* pwm_get_iomem(swim_priv_t* priv){
 
@@ -263,6 +312,51 @@ static void pwm_free_iomem(swim_priv_t* priv){
 		priv->pwm_base_vaddr = NULL;
 	}
 }
+
+static inline void pd28_set_as_pwm(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x2 << PD28_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x0 << PD28_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x0 << PD28_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x0 << PD28_PULL_POS), pp->pd_pull1_reg);
+
+	return;
+}
+
+static inline void pd28_set_as_input(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x0 << PD28_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x0 << PD28_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x0 << PD28_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x0 << PD28_PULL_POS), pp->pd_pull1_reg);
+
+	return;
+}
+
+static unsigned int pd28_get_input_val(void){
+	return ((reg_readl(pp->pd_data_reg) >> PD28_DATA_POS) & 0x1);
+}
+
+static inline void pd28_set_as_output_high(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x1 << PD28_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x3 << PD28_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x1 << PD28_PULL_POS), pp->pd_pull1_reg);
+
+	return;
+}
+
+static inline void pd28_set_as_output_low(void){
+	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x0 << PD28_DATA_POS), pp->pd_data_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x0 << PD28_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x2 << PD28_PULL_POS), pp->pd_pull1_reg);
+
+	return;
+}
+
 
 /*
  * enable: 1:enable pwm_ch0, 0: disable pwm_ch0
@@ -373,39 +467,6 @@ static inline int bit_pulse_set(register unsigned int val){
 	return 0;
 }
 
-
-#if 0
-static void swim_send_bit(swim_priv_t* priv, unsigned char bit){
-    // way at low speed
-    if(bit){
-        swim_pin_output(priv, SWIM, LOW);
-        a83t_ndelay(priv, 250); // 2*(1/8M) = 250ns
-        swim_pin_output(priv, SWIM, HIGH);
-        a83t_ndelay(priv, 2500); // 20*(1/8M) = 2500ns
-    }
-    else{
-        swim_pin_output(priv, SWIM, LOW);
-        a83t_ndelay(priv, 2500); // 2*(1/8M) = 2500ns
-        swim_pin_output(priv, SWIM, HIGH);
-        a83t_ndelay(priv, 250); // 20*(1/8M) = 250ns
-    }
-}
-#else
-static void swim_send_bit(swim_priv_t* priv, unsigned char bit){
-    // way at low speed
-    if(bit){
-        //LOW  + HIGH  = [2*(1/8M)] +  [20*(1/8M)] = 250ns + 2500ns
-        pwm_pulse_set(priv, 1, 0, 66, 6);
-		while((reg_readl(priv->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
-    }
-    else{
-		 //HIGH  + LOW  = [20*(1/8M)] +  [2*(1/8M)] = 2500ns + 250ns
-        pwm_pulse_set(priv, 1, 0, 66, 60);
-		while((reg_readl(priv->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
-    }
-}
-
-
 static inline void pwm_send_bit1(void){
     // way at low speed
     bit_pulse_set(1);
@@ -418,9 +479,11 @@ static inline void pwm_send_bit0(void){
 	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
 }
 
+static unsigned int swim_send_bit(swim_priv_t* priv, unsigned int val){
 
+	return 0;
+}
 
-#endif
 
 static char swim_rvc_bit(swim_priv_t* priv){
     unsigned int i;
@@ -678,57 +741,83 @@ static swim_handle_t swim_bus_write(swim_priv_t* priv, unsigned int addr, unsign
 	
 		return ret;
 	}
-static swim_handle_t swim_start_entry(swim_priv_t* priv){
-	int i = 0, ret = SWIM_FAIL, flag = 1;
+
+static swim_handle_t swim_start_entry_new(swim_priv_t* priv){
+	int i = 0, ret = SWIM_FAIL;
 	unsigned char ch = 0;
-	
-	swim_pin_output(priv, SWIM, HIGH);
-	swim_pin_output(priv, RST, HIGH);
+
+	pd28_set_as_output_high();
+	pd26_set_as_output_high();
 	a83t_mdelay(priv, 50);
 	
 	/*1. To make the SWIM active, the SWIM pin must be forced low during a period of 16us*/
-	swim_pin_output(priv, RST, LOW);
+	pd26_set_as_output_low();
 	a83t_mdelay(priv, 10);
-	swim_pin_output(priv, SWIM, LOW);
+	pd28_set_as_output_low();
 	a83t_udelay(priv, 1000); 	//should be 16us, but 1000us could be better
 
+	
 	/*2. four pulses at 1 kHz followed by four pulses at 2 kHz.*/
     for (i=0; i<4; i++){
-		swim_pin_output(priv, SWIM, HIGH);	//spend 1.25us
+		pd28_set_as_output_high();
         a83t_udelay(priv, 500);
-		swim_pin_output(priv, SWIM, LOW);
+		pd28_set_as_output_low();
         a83t_udelay(priv, 500);
     }
     for (i=0; i<4; i++){
-        swim_pin_output(priv, SWIM, HIGH);
+		pd28_set_as_output_high();
         a83t_udelay(priv, 250);
-        swim_pin_output(priv, SWIM, LOW);
+		pd28_set_as_output_low();
         a83t_udelay(priv, 250);
     }
-    swim_pin_output(priv, SWIM, HIGH);
+	pd28_set_as_output_high();
    // 3. Swim is already in Active State
-	swim_pin_input(priv, SWIM);
+	pd28_set_as_input();
+
+	
 
 	//4. Delay for stm8's async ack, about 20us in this For Circle Func totally cost
-
-	#if 1
-#define RST_CHK_TIMEOUT 100
-	 for (i=0; i<RST_CHK_TIMEOUT; i++){
-        if(swim_pin_input(priv, SWIM) == LOW)flag = 0;
-        if((flag==0) && (swim_pin_input(priv, SWIM)==HIGH)){
+	//about 16us low level for swim device ack to MCU
+	timer0_start_timing();
+	 for(i=0; i<RST_CHK_TIMEOUT; i++){
+        if(!pd28_get_input_val()){
 			ret = SWIM_OK;
+			timer0_get_time();
 			break;
         }
     }
-	 #endif
-    hensen_debug("Send seq header done.\n");
+	 if(ret){
+		hensen_debug("swim ack timeout!\n");
+	 }else{	 
+		ret = SWIM_FAIL;
+		timer0_start_timing();
+		 for(i=0; i<RST_CHK_TIMEOUT; i++){
+	        if(pd28_get_input_val()){
+				ret = SWIM_OK;
+				timer0_get_time();
+				break;
+	        }
+	    }
+	}
+		
+    hensen_debug("ret:%d. Send seq header done.\n", ret);
+
+	
+	return 0;
+
+
+
+
+
+
 
 	if(ret){
-		swim_pin_output(priv, RST, HIGH);
+		pd26_set_as_output_high();
 		printk(KERN_ERR "Error: Wait ACK from stm8 timeout! %s(%d)\n", __func__, __LINE__);
 		goto entry_err0;
 	}
 
+	
 	a83t_mdelay(priv, 5);
 	ret = swim_soft_reset(priv);
     if (ret){
@@ -764,6 +853,7 @@ entry_err0:
 }
 
 
+
 static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	//1. Alloc private date, and add private_date into file
 	swim_priv_t* priv = kzalloc(sizeof(swim_priv_t), GFP_KERNEL);
@@ -781,14 +871,10 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	//3. get swim_pin iomap
 	if(!swim_get_iomem(priv))return -ENOMEM;
 	if(!pwm_get_iomem(priv))return -ENOMEM;
-	swim_pin_set(priv, PWM, 0x2, 0, 0, 0);
+	pd28_set_as_pwm();
 
+	swim_start_entry_new(priv);
 
-	//swim_start_entry(priv);
-
-	while(1){
-		pwm_send_bit0();
-	}
 	
 	hensen_debug();
 	return 0;

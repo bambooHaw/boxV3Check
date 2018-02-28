@@ -13,6 +13,7 @@
 #define TIMER_BASE_ADDR 0x01C20C00
 #define TMR_0_CTRL_OFF	0X10
 #define TMR_0_INTV_OFF	0x14
+#define TMR_0_CURRENT_OFF 0x18
 
 #define PWM "PD28"
 #define PWM_BASE_ADDR 0x01C21400
@@ -56,6 +57,8 @@
 #define PULSE_STATE_HIGH 0x1
 
 
+
+#define RST_CHK_TIMEOUT 65500
 
 #define PORT_IO_BASEADDR 0x01c20800
 
@@ -232,6 +235,7 @@ typedef struct SWIM_PRIV_INFO{
 	void __iomem*	tmr_base_vaddr;
 	void __iomem*	tmr_0_ctrl;
 	void __iomem*	tmr_0_intv;
+	void __iomem*	tmr_0_current;
 
 	void __iomem*  port_io_vaddr;
 	void __iomem*  pd_cfg3_reg;	//bit[14:12] -> PD27_SELECT:  000:input  001:output
@@ -256,5 +260,130 @@ typedef struct SWIM_PRIV_INFO{
 #define reg_writeb(v, addr)		(*((volatile unsigned char  *)(addr)) = (unsigned char)(v))
 #define reg_writew(v, addr)		(*((volatile unsigned short *)(addr)) = (unsigned short)(v))
 #define reg_writel(v, addr)		(*((volatile unsigned long  *)(addr)) = (unsigned long)(v))
+
+#endif
+
+
+
+#if 0
+/*  by Hensen 2018.  //TO save time so no val check, please care about for that.
+	name: port name, eg. PG6, PG7, PG8...
+	func: multi sel val: 0 - input, 1 - output... 
+	pull:  pull val: 0 - pull up/down disable, 1 - pull up... , 2-pull down
+	drv: driver level val: 0 - level 0, 1 - level 1...
+	data: data val: 0 - low, 1 - high, only vaild when mul_sel is input/output
+*/
+static inline void swim_pin_high(void){
+
+	//func ,0x1, output
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	//date, 0x1
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+	//drv level 0x3
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x3 << PD27_DRV_POS), pp->pd_drv1_reg);
+	//pull 0x1 pull up
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x1 << PD27_PULL_POS), pp->pd_pull1_reg);
+
+}
+static inline void swim_pin_low(void){
+
+	//func ,0x1, output
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	//date, 0x0
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
+	//drv level 0x0
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x0 << PD27_DRV_POS), pp->pd_drv1_reg);
+	//pull 0x2 pull up
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x2 << PD27_PULL_POS), pp->pd_pull1_reg);
+
+}
+
+
+static swim_handle_t swim_start_entry(swim_priv_t* priv){
+	int i = 0, ret = SWIM_FAIL, flag = 1;
+	unsigned char ch = 0;
+	
+	swim_pin_output(priv, SWIM, HIGH);
+	swim_pin_output(priv, RST, HIGH);
+	a83t_mdelay(priv, 50);
+	
+	/*1. To make the SWIM active, the SWIM pin must be forced low during a period of 16us*/
+	swim_pin_output(priv, RST, LOW);
+	a83t_mdelay(priv, 10);
+	swim_pin_output(priv, SWIM, LOW);
+	a83t_udelay(priv, 1000); 	//should be 16us, but 1000us could be better
+
+	/*2. four pulses at 1 kHz followed by four pulses at 2 kHz.*/
+    for (i=0; i<4; i++){
+		swim_pin_output(priv, SWIM, HIGH);	//spend 1.25us
+        a83t_udelay(priv, 500);
+		swim_pin_output(priv, SWIM, LOW);
+        a83t_udelay(priv, 500);
+    }
+    for (i=0; i<4; i++){
+        swim_pin_output(priv, SWIM, HIGH);
+        a83t_udelay(priv, 250);
+        swim_pin_output(priv, SWIM, LOW);
+        a83t_udelay(priv, 250);
+    }
+    swim_pin_output(priv, SWIM, HIGH);
+   // 3. Swim is already in Active State
+	swim_pin_input(priv, SWIM);
+
+	//4. Delay for stm8's async ack, about 20us in this For Circle Func totally cost
+
+	#if 1
+#define RST_CHK_TIMEOUT 1000
+	 for (i=0; i<RST_CHK_TIMEOUT; i++){
+        if(swim_pin_input(priv, SWIM) == LOW)flag = 0;
+        if((flag==0) && (swim_pin_input(priv, SWIM)==HIGH)){
+			ret = SWIM_OK;
+			break;
+        }
+    }
+	 #endif
+    hensen_debug("Send seq header done.\n");
+
+	if(ret){
+		swim_pin_output(priv, RST, HIGH);
+		printk(KERN_ERR "Error: Wait ACK from stm8 timeout! %s(%d)\n", __func__, __LINE__);
+		goto entry_err0;
+	}
+
+	a83t_mdelay(priv, 5);
+	ret = swim_soft_reset(priv);
+    if (ret){
+        swim_pin_output(priv, RST, HIGH);
+		printk(KERN_ERR "Error: Swim_soft_reset failed! %s(%d)\n", __func__, __LINE__);
+		goto entry_err1;
+    }
+
+	hensen_debug("Swim_soft_reset done.\n");
+
+	a83t_mdelay(priv, 30);
+    ch = 0xA0;
+    ret = swim_bus_write(priv, SWIM_CSR_ADDR, &ch, 1); 
+    if (ret){
+        swim_pin_output(priv, RST, HIGH);
+		printk(KERN_ERR "Error: swim_write failed!\n");
+        return ret;
+    }
+    a83t_mdelay(priv, 10);
+	hensen_debug("Swim write 0xA0 done.\n");
+	
+	
+    swim_pin_output(priv, RST, HIGH);
+    a83t_mdelay(priv, 10);	
+	hensen_debug("Start the option byte loading sequence done! Swim is ready for you!\n");
+	
+	return SWIM_OK;
+	
+entry_err1:
+
+entry_err0:
+	return SWIM_TIMEOUT;
+}
+
+
 
 #endif

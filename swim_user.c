@@ -53,6 +53,8 @@ int main(int argc, char* argv[]){
 		perror("open /dev/swim failed!\n");
 		return -EAGAIN;
 	}
+
+	#if 0
 	if(argc < 3){
 		printf("Use default val: pwm_ch_ctrl = 0x0, entire_cys = 7, act_cys = 4.\n Usage: ./a.out + 1/2 + ctl/period\n");
 		return -1;
@@ -84,6 +86,8 @@ int main(int argc, char* argv[]){
 		}
 
 	}
+	#endif 
+
 	
 	getchar();
 	close(fd);
