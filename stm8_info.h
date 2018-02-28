@@ -47,6 +47,14 @@
 #define PWM_CH0_ENTIRE_ACT_CYS_POS	0	//	//0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the active cycles in the PWM clock)
 #define PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK	0xffff
 
+#define CYCLE_MODE 0x0
+#define PULSE_MODE 0x1
+#define ENTIRE_CYS_CNT 0x40		//22*3, 22= 2+20 = 20+2
+#define ACT_CYS_CNT0	0x3a	//20*3
+#define ACT_CYS_CNT1	0x6		//2*3
+#define PULSE_STATE_LOW 0x0
+#define PULSE_STATE_HIGH 0x1
+
 
 
 #define PORT_IO_BASEADDR 0x01c20800
@@ -174,12 +182,15 @@ static swim_handle_t swim_send_unit(swim_priv_t* priv, unsigned char data, unsig
 #endif
 
 typedef struct APP_WITH_KERNEL{
+	unsigned int pwm_ch_ctrl;
 	unsigned int prescal;
 	unsigned int entire_cys;
 	unsigned int act_cys;
 
 	unsigned int pulse_state;
 	unsigned int pulse_width;
+
+	unsigned int bit;
 }communication_info_t;
 
 
@@ -194,6 +205,8 @@ typedef struct APP_WITH_KERNEL{
 #define SWIM_IOCTL_RESET 				1
 #define A83T_PWM_DUTY_CYCLE_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 0, communication_info_t)
 #define A83T_PWM_PULSE_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 1, communication_info_t)
+#define A83T_PWM_REG_CTRL_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 2, communication_info_t)
+#define A83T_PWM_REG_PERIOD_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 3, communication_info_t)
 
 
 
