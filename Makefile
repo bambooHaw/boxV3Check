@@ -4,8 +4,9 @@ obj-m += v3_stm8_swim_driver.o
 
 modules:
 	$(MAKE) -C $(KERNEL_DIR) M=$(shell pwd) ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi-
-	arm-none-linux-gnueabi-gcc swim_user.c -o app_swim
+	arm-none-linux-gnueabi-gcc swim_user.c -o test_app
+	arm-none-linux-gnueabi-gcc swim_cli.c -o app_swim
 clean:
 	$(MAKE) -C $(KERNEL_DIR) M=$(shell pwd) clean 
-	rm -rf *.o swim_app
+	rm -rf *.o swim_app test_app
 

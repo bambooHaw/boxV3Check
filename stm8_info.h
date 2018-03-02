@@ -50,19 +50,19 @@
 
 #define CYCLE_MODE 0x0
 #define PULSE_MODE 0x1
-#define ENTIRE_CYS_CNT 0x40		//22*3, 22= 2+20 = 20+2
-#define ACT_CYS_CNT0	0x3a	//20*3
-#define ACT_CYS_CNT1	0x6		//2*3
+#define ENTIRE_CYS_CNT 0x42		//22*3 = 16*4 + 2 = 0x42
+#define ACT_CYS_CNT0	0x3c	//20*3 = 60 = 0x3c
+#define ACT_CYS_CNT1	0x6		//2*3 = 6 = 0x6
+
 #define PULSE_STATE_LOW 0x0
 #define PULSE_STATE_HIGH 0x1
 
 
 
-#define RST_CHK_TIMEOUT 65500
+#define RST_CHK_TIMEOUT 10000
 
 #define PORT_IO_BASEADDR 0x01c20800
 
-#if 1
 #define PD_CFG0_REG_OFFSET 0X6c
 #define PD_CFG1_REG_OFFSET 0X70
 #define PD_CFG2_REG_OFFSET 0X74
@@ -85,18 +85,6 @@
 #define PD27_PULL_POS	22
 #define PD26_PULL_POS	20
 
-#else
-//test for PD24 key sw3
-#define PD_CFG3_REG_OFFSET 0X78
-#define PD27_SELECT_POS 0
-#define PD_DATA_REG_OFFSET 0X7C
-#define PD27_DATA_POS   24
-#define PD_DRV1_REG_OFFSET 0X84
-#define PD27_DRV_POS 	16
-#define PD_PULL1_REG_OFFSET 0X8c
-#define PD27_PULL_POS	16
-
-#endif
 
 #if 0
 
@@ -110,30 +98,19 @@
 #define PD_PULL1_REG_OFFSET 0X64
 #define PD27_PULL_POS	14
 
-swim_pin_input(swim_priv_t* priv, unsigned char* pin_name){
-	swim_pin_set(priv, pin_name, 0, 0, 0, 0);
-	return ('7' == pin_name[3]) ? ((readl(priv->pd_data_reg) >> PD27_DATA_POS) & 0x1) : ((readl(priv->pd_data_reg) >> PD26_DATA_POS) & 0x1);
+//test for PD24 key sw3
+#define PD_CFG3_REG_OFFSET 0X78
+#define PD27_SELECT_POS 0
+#define PD_DATA_REG_OFFSET 0X7C
+#define PD27_DATA_POS   24
+#define PD_DRV1_REG_OFFSET 0X84
+#define PD27_DRV_POS 	16
+#define PD_PULL1_REG_OFFSET 0X8c
+#define PD27_PULL_POS	16
 
-}
+#endif
 
-static inline int swim_pin_output(swim_priv_t * priv, unsigned char * pin_name, unsigned int val){
-	return (LOW==val) ? swim_pin_set(priv, pin_name, 1, 2, 0, 0) : swim_pin_set(priv, pin_name, 1, 1, 3, 1);
-
-}
-
-
-static void __iomem* pwm_get_iomem(swim_priv_t* priv){
-
-	void __iomem* vaddr = ioremap(PWM_BASE_ADDR, PAGE_ALIGN(PWM_CH1_PERIOD_OFFSET));
-	if(!vaddr){
-		printk(KERN_ERR "Error: ioremap for %s failed!\n", __func__);
-		return NULL;
-	}
-	priv-> = vaddr;
-
-
-}
-
+#if 0
 
 static void swim_send_bit(swim_priv_t* priv, unsigned char bit){
     // way at low speed
@@ -194,6 +171,10 @@ typedef struct APP_WITH_KERNEL{
 	unsigned int pulse_width;
 
 	unsigned int bit;
+	
+	unsigned int addr;
+	unsigned char buf[128];
+	unsigned int count;
 }communication_info_t;
 
 
@@ -206,10 +187,13 @@ typedef struct APP_WITH_KERNEL{
 #define SWIM_MAX_RESEND_CNT             20
 #define A83T_IOCTL_MAGIC 'H'
 #define SWIM_IOCTL_RESET 				1
-#define A83T_PWM_DUTY_CYCLE_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 0, communication_info_t)
+#define A83T_PWM_DUTY_CYCLE_IOCTL	_IOWR(A83T_IOCTL_MAGIC, 0, communication_info_t)
 #define A83T_PWM_PULSE_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 1, communication_info_t)
 #define A83T_PWM_REG_CTRL_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 2, communication_info_t)
-#define A83T_PWM_REG_PERIOD_IOCTL		_IOWR(A83T_IOCTL_MAGIC, 3, communication_info_t)
+#define A83T_PWM_REG_PERIOD_IOCTL	_IOWR(A83T_IOCTL_MAGIC, 3, communication_info_t)
+#define A83T_SWIM_READ_IOCTL		_IOR(A83T_IOCTL_MAGIC, 4, communication_info_t)
+#define A83T_SWIM_WRITE_IOCTL		_IOW(A83T_IOCTL_MAGIC, 5, communication_info_t)
+
 
 
 
