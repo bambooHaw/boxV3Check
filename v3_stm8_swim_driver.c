@@ -406,6 +406,8 @@ static inline void pwm_pulse_clear(void){
 
 	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
 	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+	
+	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
 }
 
 static inline void pwm_send_disable(void){
@@ -462,34 +464,36 @@ static swim_handle_t swim_send_unit(unsigned char data, unsigned char len, unsig
 	
 		a83t_ndelay(2750);
 		
-		//spin_lock_irq(&pp->spinlock);
 		do {
 			send_swim_bit(0);
 			p = 0;
-			for (i=0; i<len; i++){
+			for (i=len-1; i>=0; i--){
 				m = (data >> i) & 1;
 				send_swim_bit(m);
 				p += m;
 			}
 			// parity bit
 			send_swim_bit(p & 1);
+			pwm_pulse_clear();
+			
 			reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x0 << PD28_SELECT_POS), pp->pd_cfg3_reg);	//set swim as input
+			reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x0 << PD28_PULL_POS), pp->pd_pull1_reg);
 			ack = rvc_swim_bit();
 			reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x2 << PD28_SELECT_POS), pp->pd_cfg3_reg);	//set swim as pwm func
+			reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x1 << PD28_PULL_POS), pp->pd_pull1_reg);
 			if (ack == -1){
-				//spin_unlock_irq(&pp->spinlock);
 				hensen_debug("Error: ACK failed!\n");
 				return SWIM_TIMEOUT;
 			}
 		} while (!ack && retry--);
-		//spin_unlock_irq(&pp->spinlock);
 		
 		return ack ? SWIM_OK : SWIM_FAIL;
 	}
 
 
 
-static swim_handle_t swim_soft_reset(void){
+static swim_handle_t swim_soft_reset(void)
+{
     return swim_send_unit(SWIM_CMD_SRST, SWIM_CMD_LEN, SWIM_MAX_RESEND_CNT);
 }
 
@@ -544,7 +548,6 @@ static swim_handle_t swim_bus_read(unsigned int addr, unsigned char *buf, unsign
     {
         return SWIM_FAIL;
     }
-    hensen_debug("swim_bus_read start addr=0x%X, buf[0]=%#x, size=0x%X\n", addr, buf[0], size);
     while (size)
     {
         cur_len = (size > 255) ? 255 : size;
@@ -600,7 +603,7 @@ static swim_handle_t swim_bus_read(unsigned int addr, unsigned char *buf, unsign
         cur_addr += cur_len;
         size -= cur_len;
     }
-    hensen_debug("swim_bus_read end addr=0x%X, data=0x%X, ret=%d\n", addr, first, ret);
+    //hensen_debug("swim_bus_read end addr=0x%X, data=0x%X, ret=%d\n", addr, first, ret);
     return ret;
 }
 
@@ -631,7 +634,6 @@ static swim_handle_t swim_bus_write(unsigned int addr, unsigned char *buf, unsig
 		return SWIM_FAIL;
 	}
 
-		hensen_debug("(start) addr=0x%X, buf[0]=%#x, size=0x%X\n", addr, buf[0], size);
 	while (size){
 		cur_len = (size > 255) ? 255 : size;
 
@@ -665,7 +667,7 @@ static swim_handle_t swim_bus_write(unsigned int addr, unsigned char *buf, unsig
 			ret = swim_send_unit(*buf++, 8, SWIM_MAX_RESEND_CNT);
 			if (ret){
 				pp->return_line = __LINE__;
-				hensen_debug("Error: send\n");
+				hensen_debug("Error: send unit data failed.\n");
 				break;
 			}
 		}
@@ -694,11 +696,11 @@ static swim_handle_t swim_start_entry_new(void){
 
 	pd27_set_as_input();
 	swim_set_as_output_high();
-	//rst_set_as_output_high();
+	rst_set_as_output_high();
 	a83t_mdelay(50);
 	
 	/*1. To make the SWIM active, the SWIM pin must be forced low during a period of 16us*/
-	//rst_set_as_output_low();
+	rst_set_as_output_low();
 	a83t_mdelay(10);
 	swim_set_as_output_low();
 	a83t_udelay(1000); 	//should be 16us, but 1000us could be better
@@ -706,16 +708,16 @@ static swim_handle_t swim_start_entry_new(void){
 	
 	/*2. four pulses at 1 kHz followed by four pulses at 2 kHz.*/
     for (i=0; i<4; i++){
-		swim_set_as_output_high();//cost 200us
-        a83t_udelay(300);
+		swim_set_as_output_high();
+        a83t_udelay(500);
 		swim_set_as_output_low();
-        a83t_udelay(300);
+        a83t_udelay(500);
     }
     for (i=0; i<4; i++){
-		swim_set_as_output_high(); //cost 100us
-        a83t_udelay(150);
+		swim_set_as_output_high();
+        a83t_udelay(250);
 		swim_set_as_output_low();
-        a83t_udelay(150);
+        a83t_udelay(250);
     }
 	swim_set_as_output_high();
    // 3. Swim is already in Active State
@@ -725,23 +727,19 @@ static swim_handle_t swim_start_entry_new(void){
 
 	//4. Delay for stm8's async ack, about 20us in this For Circle Func totally cost
 	//about 16us low level for swim device ack to MCU
-//	timer0_start_timing();
 	 for(i=0; i<RST_CHK_TIMEOUT; i++){
         if(!swim_get_input_val()){
 			ret = SWIM_OK;
-			//timer0_get_time();
 			break;
         }
     }
 	 if(ret){
-		hensen_debug("swim ack timeout!\n");
+		hensen_debug("Error: swim ack timeout!\n");
 	 }else{	 
 		ret = SWIM_FAIL;
-		//timer0_start_timing();
 		 for(i=0; i<RST_CHK_TIMEOUT; i++){
 	        if(swim_get_input_val()){
 				ret = SWIM_OK;
-		//		timer0_get_time();
 				break;
 	        }
 	    }
@@ -750,45 +748,39 @@ static swim_handle_t swim_start_entry_new(void){
     //hensen_debug("ret:%d. Send seq header done.\n", ret);
 
 	if(ret){
-	//	rst_set_as_output_high();
+		rst_set_as_output_high();
 		printk(KERN_ERR "Error: Wait ACK from stm8 timeout! %s(%d)\n", __func__, __LINE__);
 		goto entry_err0;
 	}
 
 	
 	swim_set_as_pwm();
-	a83t_mdelay(1);
+	pwm_pulse_clear();
 
-
-#if 1
 	ret = swim_soft_reset();
-//		pwm_send_disable();
-	//swim_set_as_input();
     if (ret){
         rst_set_as_output_high();
-		rst_set_as_input();
 		printk(KERN_ERR "Error: Swim_soft_reset failed! %s(%d)\n", __func__, __LINE__);
 		goto entry_err1;
     }
-
-//	hensen_debug("Swim_soft_reset done.\n");
+	
 	a83t_mdelay(5);
-#endif
+	//hensen_debug("Swim soft reset done.\n");
 
     ch = 0xA0;
     ret = swim_bus_write(SWIM_CSR_ADDR, &ch, 1); 
     if (ret){
-    //    rst_set_as_output_high();
+        rst_set_as_output_high();
 		printk(KERN_ERR "Error: swim_write failed!\n");
         return ret;
     }
-    a83t_mdelay(10);
-	hensen_debug("Swim write 0xA0 done.\n");
+	//hensen_debug("Swim write SWIM_CSR(0x7f80) 0xA0 done.\n");
 	
-//	rst_set_as_output_high();
+	rst_set_as_output_high();
 	swim_set_as_output_high();
-    a83t_mdelay(10);	
-	hensen_debug("Start the option byte loading sequence done! Swim is ready for you!\n");
+
+	//hensen_debug("Swim is ready for you!\n");
+	a83t_mdelay(50);
 	
 	return SWIM_OK;
 	
@@ -821,63 +813,11 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	if(!swim_get_iomem())return -ENOMEM;
 	if(!pwm_get_iomem())return -ENOMEM;
 
-	
-
-#if 1 //test for timer0 and pwm pulse
-
-	swim_set_as_pwm();
-	pwm_reg_init();
-
-	while(1){
-		a83t_mdelay(10);
-		send_swim_bit(0);
-		send_swim_bit(0);
-		send_swim_bit(1);
-		send_swim_bit(0);
-		send_swim_bit(1);
-		pwm_pulse_clear();
-		//swim_send_unit(SWIM_CMD_WOTF, SWIM_CMD_LEN, 0);
-	}
-	
-	return 0;
-
-	
-#endif
 
 	
 	swim_start_entry_new();
 
 	
-#if 0
-	//test007
-	hensen_debug("Set as low spend:");
-	timer0_start_timing();
-	swim_set_as_output_low();
-	timer0_get_time();
-
-	hensen_debug("Set as high spend:");
-
-	timer0_start_timing();
-	swim_set_as_output_high();
-	timer0_get_time();
-
-	hensen_debug("Get time spend:");
-
-	swim_set_as_input();
-	timer0_start_timing();
-	swim_get_input_val();
-	timer0_get_time();
-
-	swim_set_as_output_low();
-	a83t_mdelay(10);
-	swim_set_as_pwm();
-	while(1){
-		send_swim_bit(1);
-	}
-	//test007 end
-#endif
-
-
 	hensen_debug();
 	return 0;
 }
