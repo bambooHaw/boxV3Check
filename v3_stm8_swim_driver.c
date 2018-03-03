@@ -101,10 +101,10 @@ static void a83t_ndelay(unsigned int ns){
 	reg_writel(0x84, pp->tmr_0_ctrl);									//Select single mode, 24MHz clock source, 1 pre-scale
 	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<1), pp->tmr_0_ctrl);		//Set Reload bit
 	while((reg_readl(pp->tmr_0_ctrl)>>1) & 1);						//Waiting reload bit turns to 0
-	writel(reg_readl(pp->tmr_0_ctrl)|(1<<0), pp->tmr_0_ctrl); 		//Enable timer0
+	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<0), pp->tmr_0_ctrl); 		//Enable timer0
 
 	while(reg_readl(pp->tmr_0_current));	//Waiting timer0 current value turns to zero
-	writel(0x0, pp->tmr_0_ctrl); 		//Disable timer0	
+	reg_writel(0x0, pp->tmr_0_ctrl); 		//Disable timer0	
 }
 
 static void a83t_udelay(unsigned int us){
@@ -127,13 +127,13 @@ static void timer0_start_timing(void){
 	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<1), pp->tmr_0_ctrl);		//Set Reload bit
 	while((reg_readl(pp->tmr_0_ctrl)>>1) & 1);						//Waiting reload bit turns to 0
 //	hensen_debug("timer0 start val: %d\n", reg_readl(pp->tmr_0_current));
-	writel(reg_readl(pp->tmr_0_ctrl)|(1<<0), pp->tmr_0_ctrl); 		//Enable timer0
+	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<0), pp->tmr_0_ctrl); 		//Enable timer0
 }
 
 static void timer0_get_time(void){
 	register unsigned int cnt;
 
-	writel(reg_readl(pp->tmr_0_ctrl)& (~(1<<0)), pp->tmr_0_ctrl); 		//Disable timer0	
+	reg_writel(reg_readl(pp->tmr_0_ctrl)& (~(1<<0)), pp->tmr_0_ctrl); 		//Disable timer0	
 	cnt = reg_readl(pp->tmr_0_current);
 	cnt = 0xefffffff - cnt;
 	hensen_debug("Timing cnt: %d\n", cnt);
@@ -275,6 +275,12 @@ static inline void swim_set_as_output_low(void){
  * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
  * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
 */
+
+static inline void pwm_reg_init(void){
+	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
+	reg_writel(0x0, pp->pwm_ch0_period);	//clear pwm_ch0_period
+
+}
 static inline int pwm_reg_set(unsigned char* pin_name, unsigned int enable, unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
 
 	if('8' == pin_name[3]){
@@ -376,28 +382,30 @@ static inline int bit_pulse_set(register unsigned int val){
 
 static inline void pwm_pulse_low_250ns(void){
     // way at low speed
-
-	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm
-    //while((reg_readl(pp->pwm_ch_ctrl)>>PWM0_RDY_POS)&0x1);	//Wait for pwm0 period register ready to write
-	reg_writel(((ACT_CYS_CNT1&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT1&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
-	
-	//reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS), pp->pwm_ch_ctrl);
+    
+	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
+    reg_writel(((ACT_CYS_CNT1&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT1&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
+   
 	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
-	//while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
-	a83t_ndelay(250);
+	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
 }
 
 static inline void pwm_pulse_low_2500ns(void){
     // way at low speed
-
-	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm
-  	//while((reg_readl(pp->pwm_ch_ctrl)>>PWM0_RDY_POS)&0x1);	//Wait for pwm0 period register ready to write
+	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
 	reg_writel(((ACT_CYS_CNT0&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT0&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
-	
-	//reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS), pp->pwm_ch_ctrl);
+
 	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
-	//while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
-	a83t_ndelay(2500);
+	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+}
+
+static inline void pwm_pulse_clear(void){
+    // way at low speed
+	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
+	reg_writel(0x0, pp->pwm_ch0_period);
+
+	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
+	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
 }
 
 static inline void pwm_send_disable(void){
@@ -405,15 +413,16 @@ static inline void pwm_send_disable(void){
 }
 
 
-static void send_swim_bit(unsigned int bit){
+static inline void send_swim_bit(unsigned int bit){
 	// way at low speed
-	if(!bit){//0
+	if(0==bit){//0
 		pwm_pulse_low_2500ns();	//2500ns
 		a83t_ndelay(250);	//250ns
 	}else{//1
 		pwm_pulse_low_250ns();	//250ns	
 		a83t_ndelay(2500);	//2500ns
 	}
+	
 	return;
 }
 
@@ -452,6 +461,8 @@ static swim_handle_t swim_send_unit(unsigned char data, unsigned char len, unsig
 		char ack = 0;
 	
 		a83t_ndelay(2750);
+		
+		//spin_lock_irq(&pp->spinlock);
 		do {
 			send_swim_bit(0);
 			p = 0;
@@ -466,10 +477,13 @@ static swim_handle_t swim_send_unit(unsigned char data, unsigned char len, unsig
 			ack = rvc_swim_bit();
 			reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x2 << PD28_SELECT_POS), pp->pd_cfg3_reg);	//set swim as pwm func
 			if (ack == -1){
+				//spin_unlock_irq(&pp->spinlock);
 				hensen_debug("Error: ACK failed!\n");
 				return SWIM_TIMEOUT;
 			}
 		} while (!ack && retry--);
+		//spin_unlock_irq(&pp->spinlock);
+		
 		return ack ? SWIM_OK : SWIM_FAIL;
 	}
 
@@ -797,6 +811,8 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	}
 	filp->private_data = priv;
 	pp = priv;
+	spin_lock_init(&pp->spinlock);	
+
 	
 	//2. get timer0 iomap
 	if(!timer0_get_iomem())return -ENOMEM;
@@ -807,30 +823,23 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 
 	
 
+#if 1 //test for timer0 and pwm pulse
 
 	swim_set_as_pwm();
+	pwm_reg_init();
 
-	pwm_pulse_low_250ns();
+	while(1){
+		a83t_mdelay(10);
+		send_swim_bit(0);
+		send_swim_bit(0);
+		send_swim_bit(1);
+		send_swim_bit(0);
+		send_swim_bit(1);
+		pwm_pulse_clear();
+		//swim_send_unit(SWIM_CMD_WOTF, SWIM_CMD_LEN, 0);
+	}
+	
 	return 0;
-	
-#if 0 //test for timer0 and pwm pulse
-
-
-	swim_set_as_pwm();
-	while(1){
-		send_swim_bit(0);
-		send_swim_bit(0);
-		send_swim_bit(1);
-		send_swim_bit(0);
-		send_swim_bit(1);
-		a83t_mdelay(1000);
-	}
-
-	
-	while(1){
-		swim_send_unit(SWIM_CMD_WOTF, SWIM_CMD_LEN, SWIM_MAX_RESEND_CNT);
-		a83t_udelay(20);
-	}
 
 	
 #endif
