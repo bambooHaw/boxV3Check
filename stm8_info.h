@@ -1,13 +1,51 @@
 #ifndef __STM8_INFO__
 #define __STM8_INFO__
 
+#if 0
+//TEST FOR pc7  LED0
+#define PD_CFG3_REG_OFFSET 0x48
+#define PD27_SELECT_POS 28
+#define PD_DATA_REG_OFFSET 0x58
+#define PD27_DATA_POS   7
+#define PD_DRV1_REG_OFFSET 0X5c
+#define PD27_DRV_POS 	14
+#define PD_PULL1_REG_OFFSET 0X64
+#define PD27_PULL_POS	14
+
+//test for PD24 key sw3
+#define PD_CFG3_REG_OFFSET 0X78
+#define PD27_SELECT_POS 0
+#define PD_DATA_REG_OFFSET 0X7C
+#define PD27_DATA_POS   24
+#define PD_DRV1_REG_OFFSET 0X84
+#define PD27_DRV_POS 	16
+#define PD_PULL1_REG_OFFSET 0X8c
+#define PD27_PULL_POS	16
+
+/*  by Hensen 2018.  //TO save time so no val check, please care about for that.
+	name: port name, eg. PG6, PG7, PG8...
+	func: multi sel val: 0 - input, 1 - output... 
+	pull:  pull val: 0 - pull up/down disable, 1 - pull up... , 2-pull down
+	drv: driver level val: 0 - level 0, 1 - level 1...
+	data: data val: 0 - low, 1 - high, only vaild when mul_sel is input/output
+*/
+static inline void swim_pin_high(void){
+
+	//func ,0x1, output
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	//date, 0x1
+	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+	//drv level 0x3
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x3 << PD27_DRV_POS), pp->pd_drv1_reg);
+	//pull 0x1 pull up
+	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x1 << PD27_PULL_POS), pp->pd_pull1_reg);
+
+}
+#endif
+
 #include <linux/spinlock.h>
 #include <asm/io.h>
-
-#define hensen_debug(fmt, args...) do{printk(KERN_ALERT "%s(%d)."fmt, __func__, __LINE__, ##args);\
-										printk(KERN_ALERT "\n");\
-									}while(0)
-
+#include <linux/time.h>
 
 #define RST "PD26"
 #define SWIM "PD27"
@@ -92,99 +130,6 @@
 #define PD27_PULL_POS	22
 #define PD26_PULL_POS	20
 
-
-#if 0
-
-//TEST FOR pc7  LED0
-#define PD_CFG3_REG_OFFSET 0x48
-#define PD27_SELECT_POS 28
-#define PD_DATA_REG_OFFSET 0x58
-#define PD27_DATA_POS   7
-#define PD_DRV1_REG_OFFSET 0X5c
-#define PD27_DRV_POS 	14
-#define PD_PULL1_REG_OFFSET 0X64
-#define PD27_PULL_POS	14
-
-//test for PD24 key sw3
-#define PD_CFG3_REG_OFFSET 0X78
-#define PD27_SELECT_POS 0
-#define PD_DATA_REG_OFFSET 0X7C
-#define PD27_DATA_POS   24
-#define PD_DRV1_REG_OFFSET 0X84
-#define PD27_DRV_POS 	16
-#define PD_PULL1_REG_OFFSET 0X8c
-#define PD27_PULL_POS	16
-
-#endif
-
-#if 0
-
-static void swim_send_bit(swim_priv_t* priv, unsigned char bit){
-    // way at low speed
-    if(bit){
-        swim_pin_output(priv, SWIM, LOW);
-        a83t_ndelay(priv, 250); // 2*(1/8M) = 250ns
-        swim_pin_output(priv, SWIM, HIGH);
-        a83t_ndelay(priv, 2500); // 20*(1/8M) = 2500ns
-    }
-    else{
-        swim_pin_output(priv, SWIM, LOW);
-        a83t_ndelay(priv, 2500); // 2*(1/8M) = 2500ns
-        swim_pin_output(priv, SWIM, HIGH);
-        a83t_ndelay(priv, 250); // 20*(1/8M) = 250ns
-    }
-}
-
-
-static char swim_rvc_bit(swim_priv_t* priv){
-    unsigned int i;
-    unsigned char cnt = 0, flag = 1;
-    
-    // way at low speed
-#define ACK_CHK_TIMEOUT 1000
-    for (i=0; i<ACK_CHK_TIMEOUT; i++){
-        a83t_ndelay(priv, 125);
-        if (swim_pin_input(priv, SWIM) == LOW){
-            flag = 0;
-            cnt++;
-        }
-        if(flag == 0 && swim_pin_input(priv, SWIM) == HIGH)return (cnt <= 8) ? 1 : 0;
-    }
-	
-    return -1;
-}
-
-static void swim_send_ack(swim_priv_t* priv, unsigned char ack){
-    a83t_ndelay(priv, 2750);
-    swim_send_bit(priv, ack);
-}
-
-static char swim_rvc_ack(swim_priv_t* priv){
-    return swim_rvc_bit(priv);
-}
-
-
-
-static swim_handle_t swim_send_unit(swim_priv_t* priv, unsigned char data, unsigned char len, unsigned i
-#endif
-
-typedef struct APP_WITH_KERNEL{
-	unsigned int pwm_ch_ctrl;
-	unsigned int prescal;
-	unsigned int entire_cys;
-	unsigned int act_cys;
-
-	unsigned int pulse_state;
-	unsigned int pulse_width;
-
-	unsigned int bit;
-	
-	unsigned int addr;
-	unsigned char buf[128];
-	unsigned int count;
-}communication_info_t;
-
-
 #define STM8_SWIM_DEVICE_NAME "swim"
 #define SWIM_CMD_LEN                    3
 #define SWIM_CMD_SRST                   0x00
@@ -206,6 +151,23 @@ typedef struct APP_WITH_KERNEL{
 
 #define SWIM_CSR_ADDR 					0x7F80
 
+typedef struct APP_WITH_KERNEL{
+	unsigned int pwm_ch_ctrl;
+	unsigned int prescal;
+	unsigned int entire_cys;
+	unsigned int act_cys;
+
+	unsigned int pulse_state;
+	unsigned int pulse_width;
+
+	unsigned int bit;
+	
+	unsigned int addr;
+	unsigned char buf[128];
+	unsigned int count;
+}communication_info_t;
+
+
 typedef enum {
     SWIM_OK,
     SWIM_FAIL,
@@ -222,6 +184,8 @@ typedef enum {
 typedef struct SWIM_PRIV_INFO{
 	spinlock_t spinlock;
 	unsigned long irqflags;
+
+	struct timespec ts[2];
 	
 	void __iomem*	tmr_base_vaddr;
 	void __iomem*	tmr_irq_en;
@@ -236,6 +200,11 @@ typedef struct SWIM_PRIV_INFO{
 	void __iomem*  pd_drv1_reg; //level0, 1, 2, 3
 	void __iomem*  pd_pull1_reg;//00:pull-up/down disable, 01:pull-up, 10:pull-down, 11:reserved
 
+	unsigned int	pd_cfg3_reg_tmp;
+	unsigned int	pd_data_reg_tmp;
+	unsigned int	pd_drv1_reg_tmp;
+	unsigned int	pd_pull1_reg_tmp;
+
 	void __iomem*  pwm_base_vaddr;
 	void __iomem*  pwm_ch_ctrl;
 	void __iomem*  pwm_ch0_period;
@@ -246,49 +215,17 @@ typedef struct SWIM_PRIV_INFO{
 	void* private_date;
 }swim_priv_t;
 
-
-#define reg_readb(addr)		(*((volatile unsigned char  *)(addr)))
-#define reg_readw(addr)		(*((volatile unsigned short *)(addr)))
+#if 0	//if000 start
 #define reg_readl(addr)		(*((volatile unsigned long  *)(addr)))
-#define reg_writeb(v, addr)		(*((volatile unsigned char  *)(addr)) = (unsigned char)(v))
-#define reg_writew(v, addr)		(*((volatile unsigned short *)(addr)) = (unsigned short)(v))
 #define reg_writel(v, addr)		(*((volatile unsigned long  *)(addr)) = (unsigned long)(v))
+#else
+#define reg_readl(addr)		readl(addr)
+#define reg_writel(v, addr)		writel(v, addr)
+#endif	//if000 end
 
+#define hensen_debug(fmt, args...) do{printk(KERN_ALERT "%s(%d)."fmt, __func__, __LINE__, ##args);\
+										printk(KERN_ALERT "\n");\
+									}while(0)
 
-#if 0
-/*  by Hensen 2018.  //TO save time so no val check, please care about for that.
-	name: port name, eg. PG6, PG7, PG8...
-	func: multi sel val: 0 - input, 1 - output... 
-	pull:  pull val: 0 - pull up/down disable, 1 - pull up... , 2-pull down
-	drv: driver level val: 0 - level 0, 1 - level 1...
-	data: data val: 0 - low, 1 - high, only vaild when mul_sel is input/output
-*/
-static inline void swim_pin_high(void){
-
-	//func ,0x1, output
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	//date, 0x1
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
-	//drv level 0x3
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x3 << PD27_DRV_POS), pp->pd_drv1_reg);
-	//pull 0x1 pull up
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x1 << PD27_PULL_POS), pp->pd_pull1_reg);
-
-}
-static inline void swim_pin_low(void){
-
-	//func ,0x1, output
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	//date, 0x0
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
-	//drv level 0x0
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x0 << PD27_DRV_POS), pp->pd_drv1_reg);
-	//pull 0x2 pull up
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x2 << PD27_PULL_POS), pp->pd_pull1_reg);
-
-}
-
-
-#endif
 
 #endif

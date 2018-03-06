@@ -52,7 +52,6 @@
 #include <mach/sys_config.h>
 #include <linux/pinctrl/pinconf-sunxi.h>
 #include <linux/pinctrl/consumer.h>
-#include <linux/time.h>
 #include <linux/delay.h>
 
 #include <asm/io.h>
@@ -65,107 +64,6 @@
 #include "./stm8_info.h"
 
 static swim_priv_t* pp = NULL;
-
-
-static void __iomem* swim_get_iomem(void){
-	void __iomem* vaddr = ioremap(PORT_IO_BASEADDR, PAGE_ALIGN(PD_PULL1_REG_OFFSET));
-	if(!vaddr){
-		printk(KERN_ERR "Error: ioremap for %s failed!\n", __func__);
-		return NULL;
-	}
-	pp->port_io_vaddr = vaddr;
-	pp->pd_cfg3_reg = vaddr + PD_CFG3_REG_OFFSET;
-	pp->pd_data_reg = vaddr + PD_DATA_REG_OFFSET;
-	pp->pd_drv1_reg = vaddr + PD_DRV1_REG_OFFSET;
-	pp->pd_pull1_reg = vaddr + PD_PULL1_REG_OFFSET;
-
-	return vaddr;
-}
-static void swim_free_iomem(void){
-	if(pp->port_io_vaddr){
-		iounmap(pp->port_io_vaddr);
-		pp->port_io_vaddr = NULL;
-	}
-}
-
-
-static void rst_set_as_output_high(void){
-	
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x1 << PD26_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x1<< PD26_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x1 << PD26_PULL_POS), pp->pd_pull1_reg);	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
-
-	return;
-}
-
-static void rst_set_as_output_low(void){
-	
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x2 << PD26_PULL_POS), pp->pd_pull1_reg);	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
-
-	return;
-}
-
-
-static void __iomem* pwm_get_iomem(void){
-
-	void __iomem* vaddr = ioremap(PWM_BASE_ADDR, PAGE_ALIGN(PWM_CH1_PERIOD_OFFSET));
-	if(!vaddr){
-		printk(KERN_ERR "Error: ioremap for %s failed!\n", __func__);
-		return NULL;
-	}
-	pp->pwm_base_vaddr = vaddr;
-	pp->pwm_ch_ctrl = pp->pwm_base_vaddr + PWM_CH_CTRL_OFFSET;
-	pp->pwm_ch0_period = pp->pwm_base_vaddr + PWM_CH0_PERIOD_OFFSET;
-	pp->pwm_ch1_period = pp->pwm_base_vaddr + PWM_CH1_PERIOD_OFFSET;
-
-
-	return vaddr;
-}
-static void pwm_free_iomem(void){
-	if(pp->pwm_base_vaddr){
-		iounmap(pp->pwm_base_vaddr);
-		pp->pwm_base_vaddr = NULL;
-	}
-}
-
-static inline void swim_set_as_pwm(void){
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x2 << PD28_SELECT_POS), pp->pd_cfg3_reg);
-	return;
-}
-
-static inline void swim_set_as_input(void){
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x0 << PD28_SELECT_POS), pp->pd_cfg3_reg);
-	
-	return;
-}
-
-static unsigned int swim_get_input_val(void){
-	return ((reg_readl(pp->pd_data_reg) >> PD28_DATA_POS) & 0x1);
-}
-
-
-static inline void swim_set_as_output_high(void){
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x1 << PD28_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
-
-	return;
-}
-
-static inline void swim_set_as_output_low(void){
-#if 0
-reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x2 << PD28_PULL_POS), pp->pd_pull1_reg);
-reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x1 << PD28_DRV_POS), pp->pd_drv1_reg);
-
-#endif
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x0 << PD28_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
-
-	return;
-}
 
 #if 0
 /*
@@ -206,7 +104,6 @@ static inline int pwm_pulse_set(unsigned int enable, unsigned int pulse_state, u
 
 	return 0;
 }
-#endif 
 
 
 static inline void pwm_pulse_low_250ns(void){
@@ -263,6 +160,7 @@ static inline void pwm_stay_high_2750ns(void){
 
 
 
+
 static inline void send_swim_bit(unsigned int bit){
 	
 	struct timespec ts[2];
@@ -292,25 +190,196 @@ static inline void send_swim_bit(unsigned int bit){
 	return;
 }
 
+
+static void __iomem* pwm_get_iomem(void){
+
+	void __iomem* vaddr = ioremap(PWM_BASE_ADDR, PAGE_ALIGN(PWM_CH1_PERIOD_OFFSET));
+	if(!vaddr){
+		printk(KERN_ERR "Error: ioremap for %s failed!\n", __func__);
+		return NULL;
+	}
+	pp->pwm_base_vaddr = vaddr;
+	pp->pwm_ch_ctrl = pp->pwm_base_vaddr + PWM_CH_CTRL_OFFSET;
+	pp->pwm_ch0_period = pp->pwm_base_vaddr + PWM_CH0_PERIOD_OFFSET;
+	pp->pwm_ch1_period = pp->pwm_base_vaddr + PWM_CH1_PERIOD_OFFSET;
+
+
+	return vaddr;
+}
+static void pwm_free_iomem(void){
+	if(pp->pwm_base_vaddr){
+		iounmap(pp->pwm_base_vaddr);
+		pp->pwm_base_vaddr = NULL;
+	}
+}
+
+static inline void swim_set_as_pwm(void){
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD28_SELECT_POS))) | (0x2 << PD28_SELECT_POS), pp->pd_cfg3_reg);
+	return;
+}
+
+#endif 
+
+static  inline void my_ndelay(unsigned int ns){
+	if(!pp)return;
+	
+	getnstimeofday(pp->ts);
+	do{
+		getnstimeofday(pp->ts+1);
+	}while((pp->ts[1].tv_nsec-pp->ts[0].tv_nsec) < ns);
+	
+	return;
+}
+
+static void __iomem* swim_get_iomem(void){
+	void __iomem* vaddr = ioremap(PORT_IO_BASEADDR, PAGE_ALIGN(PD_PULL1_REG_OFFSET));
+	if(!vaddr){
+		printk(KERN_ERR "Error: ioremap for %s failed!\n", __func__);
+		return NULL;
+	}
+	pp->port_io_vaddr = vaddr;
+	pp->pd_cfg3_reg = vaddr + PD_CFG3_REG_OFFSET;
+	pp->pd_data_reg = vaddr + PD_DATA_REG_OFFSET;
+	pp->pd_drv1_reg = vaddr + PD_DRV1_REG_OFFSET;
+	pp->pd_pull1_reg = vaddr + PD_PULL1_REG_OFFSET;
+
+	return vaddr;
+}
+static void swim_free_iomem(void){
+	if(pp->port_io_vaddr){
+		iounmap(pp->port_io_vaddr);
+		pp->port_io_vaddr = NULL;
+	}
+}
+
+static void swim_get_reg_val_to_tmp(void){
+	pp->pd_cfg3_reg_tmp = reg_readl(pp->pd_cfg3_reg);
+	pp->pd_cfg3_reg_tmp = reg_readl(pp->pd_cfg3_reg);
+	pp->pd_data_reg_tmp = reg_readl(pp->pd_data_reg);
+	pp->pd_drv1_reg_tmp = reg_readl(pp->pd_drv1_reg);
+	pp->pd_pull1_reg_tmp = reg_readl(pp->pd_pull1_reg);
+}
+
+static void rst_set_as_output_high(void){
+	
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD26_DATA_POS))) | (0x1 << PD26_DATA_POS), pp->pd_data_reg);
+	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD26_DRV_POS))) | (0x1<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD26_PULL_POS))) | (0x1 << PD26_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
+
+	return;
+}
+
+static void rst_set_as_output_low(void){
+	
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
+	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD26_PULL_POS))) | (0x2 << PD26_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
+
+	return;
+}
+
+
+
+static inline void swim_set_as_input(void){
+	spin_lock_irq(&pp->spinlock);
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x0 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	spin_unlock_irq(&pp->spinlock);
+	
+	return;
+}
+
+static unsigned int swim_get_input_val(void){
+	unsigned int tmp = 0;
+
+	spin_lock_irq(&pp->spinlock);
+	//reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x0 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	tmp = (reg_readl(pp->pd_data_reg)>> PD27_DATA_POS) & 0x1;
+	//reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	spin_unlock_irq(&pp->spinlock);
+	
+	return tmp;
+}
+
+
+static inline void swim_set_as_output(void){
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	
+	return;
+}
+
+static inline void swim_set_as_high(void){
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+
+	return;
+}
+
+static inline void swim_set_as_low(void){
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
+
+	return;
+}
+static inline void swim_set_as_output_high(void){
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	
+	return;
+}
+static inline void swim_set_as_output_low(void){
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+
+	return;
+}
+
+static void swim_set_init_output_high(void){
+	spin_lock_irq(&pp->spinlock);
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD27_DRV_POS))) | (0x3<< PD27_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD27_PULL_POS))) | (0x1 << PD27_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	spin_unlock_irq(&pp->spinlock);
+
+	return;
+}
+
+static inline void send_swim_bit(unsigned int bit){
+	// way at low speed
+	swim_set_as_output();
+	if(0==bit){//0
+		swim_set_as_low();
+		my_ndelay(2500);
+		swim_set_as_high();
+		my_ndelay(250);
+	}else{//1
+		swim_set_as_low();
+		my_ndelay(250);
+		swim_set_as_high();
+		my_ndelay(2500);
+	}
+	return;
+}
+
 static char rvc_swim_bit(void){
     unsigned int i;
     unsigned char cnt = 0, flag = 1;
-    
+
+	swim_set_as_input();
 #define ACK_CHK_TIMEOUT 22
     for (i=0; i<ACK_CHK_TIMEOUT; i++){
-		stay_high_delay_125ns();
+		my_ndelay(125);
         if (LOW == swim_get_input_val()){
             flag = 0;
             cnt++;
         }
         if((flag == 0) && (HIGH == swim_get_input_val()))return (cnt <= 8) ? 1 : 0;
     }
-	
     return -1;
 }
 
 static void swim_send_ack(unsigned char ack){
-    pwm_stay_high_2750ns();
+    my_ndelay(2750);
     send_swim_bit(ack);
 }
 
@@ -320,22 +389,21 @@ static swim_handle_t swim_send_unit(unsigned char data, unsigned char len, unsig
 		register unsigned char p, m;
 		char ack = 0;
 	
-  	  	pwm_stay_high_2750ns();
+  	  	my_ndelay(2750);
 		
 		do {
 			send_swim_bit(0);
 			p = 0;
-			for (i=len-1; i>=0; i = i-1){
+			for (i=len-1; i>=0; --i){
 				m = (data >> i) & 1;
 				send_swim_bit(m);
 				p += m;
 			}
+			spin_lock_irq(&pp->spinlock);
 			send_swim_bit(p&1);		// parity bit
-			//pwm_pulse_clear();		//Forcing flushing out the pwm previous pulse from the pulse shift register
+			spin_unlock_irq(&pp->spinlock);
 			
-			swim_set_as_input();
 			ack = rvc_swim_bit();
-			swim_set_as_pwm();
 			if (ack == -1){
 				hensen_debug("Error: ACK failed!\n");
 				return SWIM_TIMEOUT;
@@ -359,8 +427,6 @@ static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
     unsigned char s = 0, p = 0, cp = 0;
     char ack = 0;
 	
-	swim_set_as_input();
-
     for (i=0; i<len+2; i++)
     {
         ack = rvc_swim_bit();
@@ -389,9 +455,7 @@ static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
         ack = 1;
     }
 	
-	//swim_set_as_pwm();
-
-    //swim_send_ack(ack);
+    swim_send_ack(ack);
 	
     return ack ? SWIM_OK : SWIM_FAIL;
 }
@@ -537,20 +601,13 @@ static swim_handle_t swim_bus_write(unsigned int addr, unsigned char *buf, unsig
 	return ret;
 }
 
-static void pd27_set_as_input(void){
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD27_SELECT_POS))) | (0x0 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD27_DRV_POS))) | (0x0 << PD27_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD27_PULL_POS))) | (0x0 << PD27_PULL_POS), pp->pd_pull1_reg);
-	return;
-}
+
 
 static swim_handle_t swim_start_entry_new(void){
 	int i = 0, ret = SWIM_FAIL;
 	unsigned char ch = 0;
 
-	pd27_set_as_input();
-	swim_set_as_output_high();
+	swim_set_init_output_high();
 	rst_set_as_output_high();
 	mdelay(10);
 	
@@ -563,15 +620,15 @@ static swim_handle_t swim_start_entry_new(void){
 
 	/*2. four pulses at 1 kHz followed by four pulses at 2 kHz.*/
     for (i=0; i<4; i++){
-		swim_set_as_output_high();
+		swim_set_as_high();
         udelay(500);
-		swim_set_as_output_low();
+		swim_set_as_low();
         udelay(500);
     }
     for (i=0; i<4; i++){
-		swim_set_as_output_high();
+		swim_set_as_high();
         udelay(250);
-		swim_set_as_output_low();
+		swim_set_as_low();
         udelay(250);
     }
 	//swim_set_as_high();//stm8 should be already pull the swim line to high level for his next 16us ack
@@ -611,10 +668,9 @@ static swim_handle_t swim_start_entry_new(void){
 
 	//5. Before start a SWIM communication, the SWIM line must be release at 1 to guarantee that it's ready for communication(at least 300ns)
 	mdelay(5);
-	swim_set_as_pwm();
 
 
-#if 1
+#if 0
 	/*SWIM_CSR/RST bit is not yet set. Soft option is meaningless(Active state is stil maintain the Active state).*/
 	ret = swim_soft_reset();
     if (ret){
@@ -628,19 +684,6 @@ static swim_handle_t swim_start_entry_new(void){
 #endif
 
 
-#if 1
-	//test007
-	ch = 0xa0;
-	swim_bus_write(SWIM_CSR_ADDR, &ch, 1);
-	mdelay(1);
-	ch = 0;
-	swim_bus_read(SWIM_CSR_ADDR, &ch, 1);
-	printk(KERN_ALERT "csr:%#x\n", ch);
-	mdelay(500);
-	
-	return 0;
-	//test007 end
-#endif
 
     ch = 0xA0;
     ret = swim_bus_write(SWIM_CSR_ADDR, &ch, 1); 
@@ -651,11 +694,24 @@ static swim_handle_t swim_start_entry_new(void){
     }
 	//hensen_debug("Swim write SWIM_CSR(0x7f80) 0xA0 done.\n");
 	
+	
 	rst_set_as_output_high();
 	swim_set_as_output_high();
 
 	mdelay(10);
-	//hensen_debug("Swim is ready for you!\n");
+	hensen_debug("Swim is ready for you!\n");
+	
+	ch = 0;
+	ret = swim_bus_read(SWIM_CSR_ADDR, &ch, 1); 
+	if (ret){
+	 rst_set_as_output_high();
+	 printk(KERN_ERR "Error: swim_read failed!\n");
+	 return ret;
+	}else{
+	 printk(KERN_ALERT "read addr(%#x)'s data: %#x\n", SWIM_CSR_ADDR, ch);
+	}
+
+
 	
 	return SWIM_OK;
 	
@@ -665,17 +721,6 @@ entry_err0:
 	return SWIM_TIMEOUT;
 }
 
-
-static  inline void my_ndelay(unsigned int ns){
-	struct timespec ts[2];
-	
-	getnstimeofday(ts);
-	do{
-		getnstimeofday(ts+1);
-	}while((ts[1].tv_nsec-ts[0].tv_nsec) < ns);
-	
-	return;
-}
 
 static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	//1. Alloc private date, and add private_date into file
@@ -691,21 +736,10 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	
 	//2. get swim_pin iomap
 	if(!swim_get_iomem())return -ENOMEM;
-	if(!pwm_get_iomem())return -ENOMEM;
+
+	swim_get_reg_val_to_tmp();	//get val to tmp for a tmp store, to prevent a hardware mis opt with a read.
 
 
-	while(1){
-		swim_set_as_output_low();
-		my_ndelay(2500);
-		swim_set_as_output_high();
-		my_ndelay(250);
-		
-		swim_set_as_output_low();
-		my_ndelay(250);
-		swim_set_as_output_high();
-		my_ndelay(2500);
-	}
-	
 	swim_start_entry_new();
 
 	
@@ -716,7 +750,6 @@ static int stm8_swim_release(struct inode* inodp, struct file* filp){
 	swim_priv_t * priv = filp->private_data;
 
 	swim_free_iomem();
-	pwm_free_iomem();
 
 	kfree(priv);
 	priv = NULL;
