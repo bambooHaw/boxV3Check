@@ -52,6 +52,7 @@
 #include <mach/sys_config.h>
 #include <linux/pinctrl/pinconf-sunxi.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/time.h>
 #include <linux/delay.h>
 
 #include <asm/io.h>
@@ -65,82 +66,6 @@
 
 static swim_priv_t* pp = NULL;
 
-static void __iomem* timer0_get_iomem(void){
-	void __iomem* vaddr = ioremap(TIMER_BASE_ADDR, PAGE_ALIGN(TMR_0_INTV_OFF));
-	if(!vaddr){
-		printk(KERN_ERR "Error: ioremap for %s failed!\n", __func__);
-		return NULL;
-	}
-	pp->tmr_base_vaddr = vaddr;
-	pp->tmr_0_ctrl = vaddr + TMR_0_CTRL_OFF;
-	pp->tmr_0_intv = vaddr + TMR_0_INTV_OFF;
-	pp->tmr_0_current = vaddr + TMR_0_CURRENT_OFF;
-	
-	return vaddr;
-}
-static void timer0_free_iomem(void){
-
-	if(pp->tmr_base_vaddr){
-		iounmap(pp->tmr_base_vaddr);
-		pp->tmr_base_vaddr = NULL;
-	}
-}
-
-/* 
- * by Hensen 2018
- */
-static void a83t_ndelay(unsigned int ns){
-
-	unsigned int tcnt;
-
-	// osc = 24MHz, min valid delay = 41.667ns, tcnt  = ns * (pclk / 100000) / 10000;
-	if(ns<42)ns=42;
-	tcnt  = ns*24/1000;
-
-	reg_writel(tcnt, pp->tmr_0_intv);									//Set interval value
-	reg_writel(0x84, pp->tmr_0_ctrl);									//Select single mode, 24MHz clock source, 1 pre-scale
-	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<1), pp->tmr_0_ctrl);		//Set Reload bit
-	while((reg_readl(pp->tmr_0_ctrl)>>1) & 1);						//Waiting reload bit turns to 0
-	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<0), pp->tmr_0_ctrl); 		//Enable timer0
-
-	while(reg_readl(pp->tmr_0_current));	//Waiting timer0 current value turns to zero
-	reg_writel(0x0, pp->tmr_0_ctrl); 		//Disable timer0	
-}
-
-static void a83t_udelay(unsigned int us){
-	while(us--)
-		a83t_ndelay(1000);
-}
-
-static void a83t_mdelay(unsigned int ms){
-	while(ms--)
-		a83t_udelay(1000);
-}
-
-static void timer0_start_timing(void){
-//	unsigned int cnt;
-
-	// osc = 24MHz, min valid delay = 41.667ns, 
-
-	reg_writel(0xefffffff, pp->tmr_0_intv);									//Set interval value
-	reg_writel(0x84, pp->tmr_0_ctrl);									//Select single mode, 24MHz clock source, 1 pre-scale
-	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<1), pp->tmr_0_ctrl);		//Set Reload bit
-	while((reg_readl(pp->tmr_0_ctrl)>>1) & 1);						//Waiting reload bit turns to 0
-//	hensen_debug("timer0 start val: %d\n", reg_readl(pp->tmr_0_current));
-	reg_writel(reg_readl(pp->tmr_0_ctrl)|(1<<0), pp->tmr_0_ctrl); 		//Enable timer0
-}
-
-static void timer0_get_time(void){
-	register unsigned int cnt;
-
-	reg_writel(reg_readl(pp->tmr_0_ctrl)& (~(1<<0)), pp->tmr_0_ctrl); 		//Disable timer0	
-	cnt = reg_readl(pp->tmr_0_current);
-	cnt = 0xefffffff - cnt;
-	hensen_debug("Timing cnt: %d\n", cnt);
-	
-	cnt = (cnt * 1000) / 24;
-	hensen_debug("Total time: %d(ns)\n", cnt);
-}
 
 static void __iomem* swim_get_iomem(void){
 	void __iomem* vaddr = ioremap(PORT_IO_BASEADDR, PAGE_ALIGN(PD_PULL1_REG_OFFSET));
@@ -166,38 +91,24 @@ static void swim_free_iomem(void){
 
 static void rst_set_as_output_high(void){
 	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
 	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x1 << PD26_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x3<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x1<< PD26_DRV_POS), pp->pd_drv1_reg);
 	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x1 << PD26_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
 
 	return;
 }
 
 static void rst_set_as_output_low(void){
 	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
 	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
 	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
 	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x2 << PD26_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
 
 	return;
 }
 
-static void rst_set_as_input(void){
-	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD26_SELECT_POS))) | (0x0 << PD26_SELECT_POS), pp->pd_cfg3_reg);
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD26_PULL_POS))) | (0x0 << PD26_PULL_POS), pp->pd_pull1_reg);	
-
-	return;
-}
-
-static unsigned int rst_get_input_val(void){
-	
-	return ((reg_readl(pp->pd_data_reg)>>PD26_DATA_POS) & 0x1);
-}
 
 static void __iomem* pwm_get_iomem(void){
 
@@ -222,21 +133,13 @@ static void pwm_free_iomem(void){
 }
 
 static inline void swim_set_as_pwm(void){
-	
 	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x2 << PD28_SELECT_POS), pp->pd_cfg3_reg);
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x1 << PD28_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x3 << PD28_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x1 << PD28_PULL_POS), pp->pd_pull1_reg);
-
 	return;
 }
-static inline void swim_set_as_input(void){
-	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x0 << PD28_SELECT_POS), pp->pd_cfg3_reg);
-	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x0 << PD28_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x0 << PD28_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x0 << PD28_PULL_POS), pp->pd_pull1_reg);
 
+static inline void swim_set_as_input(void){
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x0 << PD28_SELECT_POS), pp->pd_cfg3_reg);
+	
 	return;
 }
 
@@ -244,26 +147,38 @@ static unsigned int swim_get_input_val(void){
 	return ((reg_readl(pp->pd_data_reg) >> PD28_DATA_POS) & 0x1);
 }
 
+
 static inline void swim_set_as_output_high(void){
-	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
 	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x1 << PD28_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x3 << PD28_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x1 << PD28_PULL_POS), pp->pd_pull1_reg);
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
 
 	return;
 }
 
 static inline void swim_set_as_output_low(void){
-	
-	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
+#if 0
+reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x2 << PD28_PULL_POS), pp->pd_pull1_reg);
+reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x1 << PD28_DRV_POS), pp->pd_drv1_reg);
+
+#endif
 	reg_writel((reg_readl(pp->pd_data_reg) & (~(0x1 << PD28_DATA_POS))) | (0x0 << PD28_DATA_POS), pp->pd_data_reg);
-	reg_writel((reg_readl(pp->pd_drv1_reg) & (~(0X3 << PD28_DRV_POS))) | (0x0 << PD28_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x2 << PD28_PULL_POS), pp->pd_pull1_reg);
+	reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x1 << PD28_SELECT_POS), pp->pd_cfg3_reg);
 
 	return;
 }
 
+#if 0
+/*
+ * enable: 1:enable pwm_ch0, 0: disable pwm_ch0
+ * prescal: This bts should be setting before the PWM Channel 0 clock gate on.
+			 * 0000:/120	0001:/180	0010:/240	0011:/360
+			 * 0100:/480	0101:/		0110:/		0111:/
+			 * 1000:/12k	1001:/24k	1010:/36k	1011:/48k
+			 * 1100:/72k	1101:/		1110:/		1111:/1
+ * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
+ * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
+*/
+
 
 /*
  * enable: 1:enable pwm_ch0, 0: disable pwm_ch0
@@ -276,75 +191,6 @@ static inline void swim_set_as_output_low(void){
  * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
 */
 
-static inline void pwm_reg_init(void){
-	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
-	reg_writel(0x0, pp->pwm_ch0_period);	//clear pwm_ch0_period
-
-}
-static inline int pwm_reg_set(unsigned char* pin_name, unsigned int enable, unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
-
-	if('8' == pin_name[3]){
-		if(!enable){
-			reg_writel(0x0<<PWM_CH0_EN_POS, pp->pwm_ch_ctrl);
-			return 0;
-		}else{
-			
-			reg_writel(0x0<<PWM_CH0_EN_POS, pp->pwm_ch_ctrl);
-			reg_writel(((entire_cys&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((act_cys&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
-			reg_writel((0x0<<PWM0_BYPASS_POS) | (0x1<<PWM_CH0_ACT_STA_POS) | ((prescal&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS), pp->pwm_ch_ctrl);
-			reg_writel(reg_readl(pp->pwm_ch_ctrl) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
-			
-		}
-	}
-
-	return 0;
-}
-
-
-/*
- * enable: 1:enable pwm_ch0, 0: disable pwm_ch0
- * prescal: This bts should be setting before the PWM Channel 0 clock gate on.
-			 * 0000:/120	0001:/180	0010:/240	0011:/360
-			 * 0100:/480	0101:/		0110:/		0111:/
-			 * 1000:/12k	1001:/24k	1010:/36k	1011:/48k
-			 * 1100:/72k	1101:/		1110:/		1111:/1
- * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
- * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
-*/
-static inline int pwm_reg_ctrl(unsigned int pwm_ch_ctrl){
-	reg_writel(pwm_ch_ctrl, pp->pwm_ch_ctrl);
-	return 0;
-}
-
-
-static inline int pwm_reg_period(unsigned int entire_cys, unsigned int act_cys){
-
-	reg_writel(((entire_cys&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((act_cys&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
-	return 0;
-}
-
-
-
-static inline int pwm_reg_get(void){
-
-	hensen_debug("pwm_ch_ctrl: %d\n", reg_readl(pp->pwm_ch_ctrl));
-	hensen_debug("pwm_ch0_period: %d\n", reg_readl(pp->pwm_ch0_period));
-	return 0;
-}
-
-/* because the prescale val is 0xf, so PWM CLK equals to 24MHz/1 as 24MHz
- * 
-*/
-static inline void pwm_waveform_set(unsigned int prescal, unsigned int entire_cys, unsigned int act_cys){
-
-	pwm_reg_set(PWM, 1, prescal, entire_cys, act_cys);
-}
-
-/* After the pulse is finished, the bit(PWM_CH0_PUL_START_POS) will be cleared automatically.
- * pulse_state: 0:low_level, 1:high_level
- * pulse_width:
- * 
-*/
 static inline int pwm_pulse_set(unsigned int enable, unsigned int pulse_state, unsigned int  entire_cys, unsigned int pulse_width){
 	unsigned int val = 0;
 	
@@ -360,30 +206,11 @@ static inline int pwm_pulse_set(unsigned int enable, unsigned int pulse_state, u
 
 	return 0;
 }
+#endif 
 
-static inline int bit_pulse_set(register unsigned int val){
-
-    //bit1: LOW  + HIGH  = [2*(1/8M)] +  [20*(1/8M)] = 250ns + 2500ns
-    //bit0: HIGH  + LOW  = [20*(1/8M)] +  [2*(1/8M)] = 2500ns + 250ns
-
-	if(1==val){
-		val = (PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS);
-		reg_writel(val, pp->pwm_ch_ctrl);
-		reg_writel(((ENTIRE_CYS_CNT&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT1&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
-		reg_writel(val | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
-	}else{
-		val = (PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS);
-		reg_writel(val, pp->pwm_ch_ctrl);
-		reg_writel(((ENTIRE_CYS_CNT&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT0&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
-		reg_writel(val | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
-	}
-	return 0;
-}
 
 static inline void pwm_pulse_low_250ns(void){
     // way at low speed
-    
-	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
     reg_writel(((ACT_CYS_CNT1&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT1&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
    
 	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
@@ -392,39 +219,76 @@ static inline void pwm_pulse_low_250ns(void){
 
 static inline void pwm_pulse_low_2500ns(void){
     // way at low speed
-	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
 	reg_writel(((ACT_CYS_CNT0&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT0&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
 
 	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
 	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+
 }
 
-static inline void pwm_pulse_clear(void){
+static inline void stay_high_delay_125ns(void){
     // way at low speed
-	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
-	reg_writel(0x0, pp->pwm_ch0_period);
+    swim_set_as_pwm();
+	reg_writel(((ACT_CYS_CNT3&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT_ZERO&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
+	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
+	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+	swim_set_as_input();
+}
+
+static inline void pwm_stay_high_250ns(void){
+    // way at low speed
+    
+    reg_writel(((ACT_CYS_CNT1&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT_ZERO&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
+   
+	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
+	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+}
+
+static inline void pwm_stay_high_2500ns(void){
+    // way at low speed
+	reg_writel(((ACT_CYS_CNT0&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT_ZERO&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
 
 	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
 	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
-	
-	reg_writel(0x0, pp->pwm_ch_ctrl);	//disable pwm, clear pwm_ch_ctrl
+
 }
 
-static inline void pwm_send_disable(void){
-	reg_writel((reg_readl(pp->pwm_ch_ctrl) & (~(0x1<<PWM_CH0_EN_POS))), pp->pwm_ch_ctrl);
+static inline void pwm_stay_high_2750ns(void){
+    // way at low speed
+	reg_writel(((ENTIRE_CYS_CNT&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((ACT_CYS_CNT_ZERO&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
+	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
+	while((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1);	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+
 }
+
 
 
 static inline void send_swim_bit(unsigned int bit){
+	
+	struct timespec ts[2];
+	
+	spin_lock_irq(&pp->spinlock);
 	// way at low speed
 	if(0==bit){//0
+		getnstimeofday(ts);
 		pwm_pulse_low_2500ns();	//2500ns
-		a83t_ndelay(250);	//250ns
+		do{
+			getnstimeofday(ts+1);
+		}while((ts[1].tv_nsec-ts[0].tv_nsec) < 2750);
+		
+		//pwm_stay_high_250ns();	//250ns
+		//udelay(1);
 	}else{//1
+		getnstimeofday(ts);
 		pwm_pulse_low_250ns();	//250ns	
-		a83t_ndelay(2500);	//2500ns
+		do{
+			getnstimeofday(ts+1);
+		}while((ts[1].tv_nsec-ts[0].tv_nsec) < 2750);
+		
+		//pwm_stay_high_2500ns();	//2500ns
+		//udelay(3);
 	}
-	
+	spin_unlock_irq(&pp->spinlock);
 	return;
 }
 
@@ -432,10 +296,9 @@ static char rvc_swim_bit(void){
     unsigned int i;
     unsigned char cnt = 0, flag = 1;
     
-    // way at low speed
-#define ACK_CHK_TIMEOUT 100
+#define ACK_CHK_TIMEOUT 22
     for (i=0; i<ACK_CHK_TIMEOUT; i++){
-        //a83t_ndelay(125);
+		stay_high_delay_125ns();
         if (LOW == swim_get_input_val()){
             flag = 0;
             cnt++;
@@ -447,40 +310,32 @@ static char rvc_swim_bit(void){
 }
 
 static void swim_send_ack(unsigned char ack){
-    a83t_ndelay(2750);
+    pwm_stay_high_2750ns();
     send_swim_bit(ack);
 }
-
-static char rvc_swim_ack(void){
-    return rvc_swim_bit();
-}
-
 
 
 static swim_handle_t swim_send_unit(unsigned char data, unsigned char len, unsigned int retry){
 		signed char i;
-		unsigned char p, m;
+		register unsigned char p, m;
 		char ack = 0;
 	
-		a83t_ndelay(2750);
+  	  	pwm_stay_high_2750ns();
 		
 		do {
 			send_swim_bit(0);
 			p = 0;
-			for (i=len-1; i>=0; i--){
+			for (i=len-1; i>=0; i = i-1){
 				m = (data >> i) & 1;
 				send_swim_bit(m);
 				p += m;
 			}
-			// parity bit
-			send_swim_bit(p & 1);
-			pwm_pulse_clear();
+			send_swim_bit(p&1);		// parity bit
+			//pwm_pulse_clear();		//Forcing flushing out the pwm previous pulse from the pulse shift register
 			
-			reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x0 << PD28_SELECT_POS), pp->pd_cfg3_reg);	//set swim as input
-			reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x0 << PD28_PULL_POS), pp->pd_pull1_reg);
+			swim_set_as_input();
 			ack = rvc_swim_bit();
-			reg_writel((reg_readl(pp->pd_cfg3_reg) & (~(0x7 << PD28_SELECT_POS))) | (0x2 << PD28_SELECT_POS), pp->pd_cfg3_reg);	//set swim as pwm func
-			reg_writel((reg_readl(pp->pd_pull1_reg) & (~(0X3 << PD28_PULL_POS))) | (0x1 << PD28_PULL_POS), pp->pd_pull1_reg);
+			swim_set_as_pwm();
 			if (ack == -1){
 				hensen_debug("Error: ACK failed!\n");
 				return SWIM_TIMEOUT;
@@ -501,8 +356,10 @@ static swim_handle_t swim_soft_reset(void)
 static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
 {
     char i;
-    unsigned char s = 0, m = 0, p = 0, cp = 0;
+    unsigned char s = 0, p = 0, cp = 0;
     char ack = 0;
+	
+	swim_set_as_input();
 
     for (i=0; i<len+2; i++)
     {
@@ -521,8 +378,8 @@ static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
         }
         else
         {
-            m <<= 1;
-            m |= ack;
+            *data <<= 1;
+            *data |= ack;
             cp += ack;
         }
     }
@@ -531,9 +388,11 @@ static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
     {
         ack = 1;
     }
+	
+	//swim_set_as_pwm();
 
-    swim_send_ack(ack);
-
+    //swim_send_ack(ack);
+	
     return ack ? SWIM_OK : SWIM_FAIL;
 }
 
@@ -548,6 +407,7 @@ static swim_handle_t swim_bus_read(unsigned int addr, unsigned char *buf, unsign
     {
         return SWIM_FAIL;
     }
+	
     while (size)
     {
         cur_len = (size > 255) ? 255 : size;
@@ -556,31 +416,31 @@ static swim_handle_t swim_bus_read(unsigned int addr, unsigned char *buf, unsign
         if (ret)
         {
             pp->return_line = __LINE__;
-            break;
+   			return ret;
         }
         ret = swim_send_unit(cur_len, 8, 0);
         if (ret)
         {
             pp->return_line = __LINE__;
-            break;
+   			return ret;
         }
         ret = swim_send_unit((cur_addr >> 16) & 0xFF, 8, 0);
         if (ret)
         {
             pp->return_line = __LINE__;
-            break;
+   			return ret;
         }
         ret = swim_send_unit((cur_addr >> 8) & 0xFF, 8, 0);
         if (ret)
         {
             pp->return_line = __LINE__;
-            break;
+   			return ret;
         }
         ret = swim_send_unit((cur_addr >> 0) & 0xFF, 8, 0);
         if (ret)
         {
             pp->return_line = __LINE__;
-            break;
+   			return ret;
         }
         for (i = 0; i < cur_len; i++)
         {
@@ -589,15 +449,11 @@ static swim_handle_t swim_bus_read(unsigned int addr, unsigned char *buf, unsign
             {
                 pp->return_line = __LINE__;
 				hensen_debug("Error receive\n");
-                break;
+                return SWIM_FAIL;
             }
 
             if (first == 0)
                 first = *(buf - 1);
-        }
-        if (ret)
-        {
-            break;
         }
 
         cur_addr += cur_len;
@@ -636,7 +492,6 @@ static swim_handle_t swim_bus_write(unsigned int addr, unsigned char *buf, unsig
 
 	while (size){
 		cur_len = (size > 255) ? 255 : size;
-
 		ret = swim_send_unit(SWIM_CMD_WOTF, SWIM_CMD_LEN, SWIM_MAX_RESEND_CNT);
 		if (ret)
 		{
@@ -697,37 +552,37 @@ static swim_handle_t swim_start_entry_new(void){
 	pd27_set_as_input();
 	swim_set_as_output_high();
 	rst_set_as_output_high();
-	a83t_mdelay(50);
+	mdelay(10);
 	
 	/*1. To make the SWIM active, the SWIM pin must be forced low during a period of 16us*/
 	rst_set_as_output_low();
-	a83t_mdelay(10);
+	mdelay(10);
 	swim_set_as_output_low();
-	a83t_udelay(1000); 	//should be 16us, but 1000us could be better
+	udelay(1000); 	//should be 16us, but 1000us could be better
 
-	
+
 	/*2. four pulses at 1 kHz followed by four pulses at 2 kHz.*/
     for (i=0; i<4; i++){
 		swim_set_as_output_high();
-        a83t_udelay(500);
+        udelay(500);
 		swim_set_as_output_low();
-        a83t_udelay(500);
+        udelay(500);
     }
     for (i=0; i<4; i++){
 		swim_set_as_output_high();
-        a83t_udelay(250);
+        udelay(250);
 		swim_set_as_output_low();
-        a83t_udelay(250);
+        udelay(250);
     }
-	swim_set_as_output_high();
+	//swim_set_as_high();//stm8 should be already pull the swim line to high level for his next 16us ack
    // 3. Swim is already in Active State
 	swim_set_as_input();
-
 	
 
 	//4. Delay for stm8's async ack, about 20us in this For Circle Func totally cost
 	//about 16us low level for swim device ack to MCU
 	 for(i=0; i<RST_CHK_TIMEOUT; i++){
+	 	udelay(1);
         if(!swim_get_input_val()){
 			ret = SWIM_OK;
 			break;
@@ -738,6 +593,7 @@ static swim_handle_t swim_start_entry_new(void){
 	 }else{	 
 		ret = SWIM_FAIL;
 		 for(i=0; i<RST_CHK_TIMEOUT; i++){
+	 		udelay(1);
 	        if(swim_get_input_val()){
 				ret = SWIM_OK;
 				break;
@@ -753,10 +609,13 @@ static swim_handle_t swim_start_entry_new(void){
 		goto entry_err0;
 	}
 
-	
+	//5. Before start a SWIM communication, the SWIM line must be release at 1 to guarantee that it's ready for communication(at least 300ns)
+	mdelay(5);
 	swim_set_as_pwm();
-	pwm_pulse_clear();
 
+
+#if 1
+	/*SWIM_CSR/RST bit is not yet set. Soft option is meaningless(Active state is stil maintain the Active state).*/
 	ret = swim_soft_reset();
     if (ret){
         rst_set_as_output_high();
@@ -764,8 +623,24 @@ static swim_handle_t swim_start_entry_new(void){
 		goto entry_err1;
     }
 	
-	a83t_mdelay(5);
+	mdelay(5);
 	//hensen_debug("Swim soft reset done.\n");
+#endif
+
+
+#if 1
+	//test007
+	ch = 0xa0;
+	swim_bus_write(SWIM_CSR_ADDR, &ch, 1);
+	mdelay(1);
+	ch = 0;
+	swim_bus_read(SWIM_CSR_ADDR, &ch, 1);
+	printk(KERN_ALERT "csr:%#x\n", ch);
+	mdelay(500);
+	
+	return 0;
+	//test007 end
+#endif
 
     ch = 0xA0;
     ret = swim_bus_write(SWIM_CSR_ADDR, &ch, 1); 
@@ -779,8 +654,8 @@ static swim_handle_t swim_start_entry_new(void){
 	rst_set_as_output_high();
 	swim_set_as_output_high();
 
+	mdelay(10);
 	//hensen_debug("Swim is ready for you!\n");
-	a83t_mdelay(50);
 	
 	return SWIM_OK;
 	
@@ -791,10 +666,18 @@ entry_err0:
 }
 
 
+static  inline void my_ndelay(unsigned int ns){
+	struct timespec ts[2];
+	
+	getnstimeofday(ts);
+	do{
+		getnstimeofday(ts+1);
+	}while((ts[1].tv_nsec-ts[0].tv_nsec) < ns);
+	
+	return;
+}
 
 static int stm8_swim_open(struct inode* inodp, struct file* filp){
-	int i = 0;
-	
 	//1. Alloc private date, and add private_date into file
 	swim_priv_t* priv = kzalloc(sizeof(swim_priv_t), GFP_KERNEL);
 	if(!priv){
@@ -806,14 +689,22 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	spin_lock_init(&pp->spinlock);	
 
 	
-	//2. get timer0 iomap
-	if(!timer0_get_iomem())return -ENOMEM;
-	
-	//3. get swim_pin iomap
+	//2. get swim_pin iomap
 	if(!swim_get_iomem())return -ENOMEM;
 	if(!pwm_get_iomem())return -ENOMEM;
 
 
+	while(1){
+		swim_set_as_output_low();
+		my_ndelay(2500);
+		swim_set_as_output_high();
+		my_ndelay(250);
+		
+		swim_set_as_output_low();
+		my_ndelay(250);
+		swim_set_as_output_high();
+		my_ndelay(2500);
+	}
 	
 	swim_start_entry_new();
 
@@ -827,7 +718,6 @@ static int stm8_swim_release(struct inode* inodp, struct file* filp){
 	swim_free_iomem();
 	pwm_free_iomem();
 
-	timer0_free_iomem();
 	kfree(priv);
 	priv = NULL;
 	pp = NULL;
@@ -945,65 +835,13 @@ static long a83t_swim_ioctl(struct file *filp, unsigned int cmd, unsigned long a
     return ret;
 }
 
-
-
-static long hensen_pwm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
-    swim_handle_t ret = 0;
-	communication_info_t* info = (communication_info_t*)arg;
-	
-	if(A83T_IOCTL_MAGIC != _IOC_TYPE(cmd)){
-		printk(KERN_ERR "unlocked_ioctl error!\n");
-		return -EINVAL;
-	}
-	
-    switch(_IOC_NR(cmd)){
-        case 0:
-			hensen_debug("prescal:%#x\n", info->prescal);
-			pwm_waveform_set(info->prescal, info->entire_cys, info->act_cys);
-			pwm_reg_get();
-            break;
-		case 1:
-			pwm_pulse_set(1, info->pulse_state, info->entire_cys, info->pulse_width);
-			pwm_reg_get();
-			break;
-		case 2:
-			pwm_reg_ctrl(info->pwm_ch_ctrl);
-			pwm_reg_get();
-			break;
-		case 3:
-			pwm_reg_period(info->entire_cys, info->act_cys);
-			pwm_reg_get();
-			break;
-		case 4:
-			info->count = 1;
-			memset(info->buf, 0, sizeof(unsigned char)*info->count);
-			if(swim_bus_read(info->addr, info->buf, info->count)){
-				hensen_debug("ERROR: read!\n");
-			}
-			break;
-		case 5:
-			info->count = 1;
-			if(swim_bus_write(info->addr, info->buf, info->count)){
-				hensen_debug("ERROR: write!\n");
-			}
-			break;
-        default:
-        	hensen_debug("Error: unlocked_ioctl!\n");
-            break;
-    }
-
-    return ret;
-}
-
-
 static struct file_operations stm8_swim_fops = {
 	.open = stm8_swim_open,
 	.release = stm8_swim_release,
     .write          = a83t_swim_write,
     .read           = a83t_swim_read,
     .llseek         = a83t_swim_seek,
-//    .unlocked_ioctl = a83t_swim_ioctl,
-    .unlocked_ioctl = hensen_pwm_ioctl,
+    .unlocked_ioctl = a83t_swim_ioctl,
 };
 	
 static struct miscdevice stm8_swim_misc = {

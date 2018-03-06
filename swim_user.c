@@ -64,47 +64,54 @@ int main(int argc, char* argv[]){
 
 	#if 1
 	if(argc < 2){
-		printf("Use default val: pwm_ch_ctrl = 0x0, entire_cys = 7, act_cys = 4.\n Usage: ./a.out + 1/2 + ctl/period\n");
-		return -1;
+		printf("Use default val: pwm_ch_ctrl = 0x0, entire_cys = 7, act_cys = 4.\n\t\t\t \
+						Usage: \n\t\t\t \
+							./a.out + 0 + reg_addr  -> read reg_addr\n\t\t\t \
+							./a.out + 1 + reg_addr + data ->write reg_addr data\n");
+						
+		close(fd);
+		return 0;
 	}else{
 		val = strtoul(argv[1], &result, 16);	//0 -> read
 		if(0 == val){
 			val = strtoul(argv[2], &result, 16);
 			info.addr = val;
-			printf("read addr: %#x(%d)\n", info.addr, info.addr);
-					
+		
 			ret = ioctl(fd, A83T_SWIM_READ_IOCTL, (unsigned long)(&info));
 			if(ret){
 				perror("ioctl failed!\n");
 				return ret;
 			}
+			printf("Read:reg(%#x)'s data(%#x).\n", info.addr, info.buf[0]);
 		}else if(1 == val){	//1 -> WRITE
 			val = strtoul(argv[2], &result, 16);
 			info.addr = val;
 			val = strtoul(argv[3], &result, 16);
 			info.buf[0] = (unsigned char)val;
 			
-			printf("write addr: %#x(%d), buf:%s\n", info.addr, info.addr, info.buf);
 	
 			ret = ioctl(fd, A83T_SWIM_WRITE_IOCTL, (unsigned long)(&info));
 			if(ret){
 				perror("ioctl failed!\n");
 				return ret;
 			}
+			printf("write addr(%#x), data:(%#x)\n", info.addr, info.buf[0]);
+			
 			sleep(1);
 			ret = ioctl(fd, A83T_SWIM_READ_IOCTL, (unsigned long)(&info));
 			if(ret){
 				perror("ioctl failed!\n");
 				return ret;
 			}
+			printf("Read:reg(%#x)'s data(%#x).\n", info.addr, info.buf[0]);
 
 		}
-
 	}
 	#endif 
 
 	
-	getchar();
+	//getchar();
+	puts("");
 	close(fd);
 	return 0;
 }
