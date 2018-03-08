@@ -60,6 +60,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/string.h>
+#include <linux/vmalloc.h>
 
 #include "./stm8_info.h"
 
@@ -76,19 +77,6 @@ static swim_priv_t* pp = NULL;
  * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
  * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
 */
-
-
-/*
- * enable: 1:enable pwm_ch0, 0: disable pwm_ch0
- * prescal: This bts should be setting before the PWM Channel 0 clock gate on.
-			 * 0000:/120	0001:/180	0010:/240	0011:/360
-			 * 0100:/480	0101:/		0110:/		0111:/
-			 * 1000:/12k	1001:/24k	1010:/36k	1011:/48k
-			 * 1100:/72k	1101:/		1110:/		1111:/1
- * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
- * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
-*/
-
 static inline int pwm_pulse_set(unsigned int enable, unsigned int pulse_state, unsigned int  entire_cys, unsigned int pulse_width){
 	unsigned int val = 0;
 	
@@ -220,6 +208,8 @@ static inline void swim_set_as_pwm(void){
 
 #endif 
 
+
+
 static  inline void my_ndelay(unsigned int ns){
 	if(!pp)return;
 	
@@ -254,39 +244,33 @@ static void swim_free_iomem(void){
 
 static void swim_get_reg_val_to_tmp(void){
 	pp->pd_cfg3_reg_tmp = reg_readl(pp->pd_cfg3_reg);
-	pp->pd_cfg3_reg_tmp = reg_readl(pp->pd_cfg3_reg);
-	pp->pd_data_reg_tmp = reg_readl(pp->pd_data_reg);
-	pp->pd_drv1_reg_tmp = reg_readl(pp->pd_drv1_reg);
 	pp->pd_pull1_reg_tmp = reg_readl(pp->pd_pull1_reg);
+	pp->pd_drv1_reg_tmp = reg_readl(pp->pd_drv1_reg);
+	pp->pd_data_reg_tmp = reg_readl(pp->pd_data_reg);
 }
 
 static void rst_set_as_output_high(void){
 	
-	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD26_DATA_POS))) | (0x1 << PD26_DATA_POS), pp->pd_data_reg);
-	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD26_DRV_POS))) | (0x1<< PD26_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD26_PULL_POS))) | (0x1 << PD26_PULL_POS), pp->pd_pull1_reg);	
 	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD26_PULL_POS))) | (0x1 << PD26_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD26_DRV_POS))) | (0x1<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD26_DATA_POS))) | (0x1 << PD26_DATA_POS), pp->pd_data_reg);
 
 	return;
 }
 
 static void rst_set_as_output_low(void){
 	
-	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
-	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD26_PULL_POS))) | (0x2 << PD26_PULL_POS), pp->pd_pull1_reg);	
 	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD26_SELECT_POS))) | (0x1 << PD26_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD26_PULL_POS))) | (0x0 << PD26_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD26_DRV_POS))) | (0x0<< PD26_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD26_DATA_POS))) | (0x0 << PD26_DATA_POS), pp->pd_data_reg);
 
 	return;
 }
 
-
-
 static inline void swim_set_as_input(void){
-	spin_lock_irq(&pp->spinlock);
 	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x0 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	spin_unlock_irq(&pp->spinlock);
-	
 	return;
 }
 
@@ -294,14 +278,37 @@ static unsigned int swim_get_input_val(void){
 	unsigned int tmp = 0;
 
 	spin_lock_irq(&pp->spinlock);
-	//reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x0 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	tmp = (reg_readl(pp->pd_data_reg)>> PD27_DATA_POS) & 0x1;
-	//reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	tmp = reg_readl(pp->pd_data_reg);
+	tmp = (tmp >> PD27_DATA_POS) & 0x1;
 	spin_unlock_irq(&pp->spinlock);
 	
 	return tmp;
 }
 
+
+static void swim_set_init_output_high(void){
+	spin_lock_irq(&pp->spinlock);
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD27_PULL_POS))) | (0x0 << PD27_PULL_POS), pp->pd_pull1_reg);	
+	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD27_DRV_POS))) | (0x0<< PD27_DRV_POS), pp->pd_drv1_reg);
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+	spin_unlock_irq(&pp->spinlock);
+
+	return;
+}
+
+static inline void swim_set_as_output_high(void){
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+
+	return;
+}
+static inline void swim_set_as_output_low(void){
+	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
+
+	return;
+}
 
 static inline void swim_set_as_output(void){
 	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
@@ -310,43 +317,39 @@ static inline void swim_set_as_output(void){
 }
 
 static inline void swim_set_as_high(void){
-	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
+	writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
 
 	return;
 }
 
 static inline void swim_set_as_low(void){
-	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
-
-	return;
-}
-static inline void swim_set_as_output_high(void){
-	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
-	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	
-	return;
-}
-static inline void swim_set_as_output_low(void){
-	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
-	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
+	writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x0 << PD27_DATA_POS), pp->pd_data_reg);
 
 	return;
 }
 
-static void swim_set_init_output_high(void){
-	spin_lock_irq(&pp->spinlock);
-	reg_writel((pp->pd_data_reg_tmp & (~(0x1 << PD27_DATA_POS))) | (0x1 << PD27_DATA_POS), pp->pd_data_reg);
-	reg_writel((pp->pd_drv1_reg_tmp & (~(0X3 << PD27_DRV_POS))) | (0x3<< PD27_DRV_POS), pp->pd_drv1_reg);
-	reg_writel((pp->pd_pull1_reg_tmp & (~(0X3 << PD27_PULL_POS))) | (0x1 << PD27_PULL_POS), pp->pd_pull1_reg);	
-	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x1 << PD27_SELECT_POS), pp->pd_cfg3_reg);
-	spin_unlock_irq(&pp->spinlock);
+#define S_0  do{swim_set_as_low();\
+    __asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+    __asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+    __asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+    __asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+    __asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+    swim_set_as_high();\
+    __asm("NOP\nNOP\nNOP\n");\
+    }while(0)   //39+1 + 3+1
+#define S_1  do{swim_set_as_low();\
+		__asm("NOP\nNOP\nNOP\n");\
+		swim_set_as_high();\
+		__asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+		__asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+		__asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+		__asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+		__asm("NOP\nNOP\nNOP\nNOP\nNOP\nNOP\nNOP\n");\
+		}while(0)	//3+1 + 39+1   
 
-	return;
-}
 
 static inline void send_swim_bit(unsigned int bit){
 	// way at low speed
-	swim_set_as_output();
 	if(0==bit){//0
 		swim_set_as_low();
 		my_ndelay(2500);
@@ -361,12 +364,27 @@ static inline void send_swim_bit(unsigned int bit){
 	return;
 }
 
+static inline void send_swim_bit0(void){
+	swim_set_as_low();
+	my_ndelay(2500);
+	swim_set_as_high();
+	my_ndelay(250);
+	return;
+}
+
+static inline void send_swim_bit1(void){
+	swim_set_as_low();
+	my_ndelay(250);
+	swim_set_as_high();
+	my_ndelay(2500);
+	return;
+}
+
 static char rvc_swim_bit(void){
     unsigned int i;
     unsigned char cnt = 0, flag = 1;
 
-	swim_set_as_input();
-#define ACK_CHK_TIMEOUT 22
+#define ACK_CHK_TIMEOUT 66
     for (i=0; i<ACK_CHK_TIMEOUT; i++){
 		my_ndelay(125);
         if (LOW == swim_get_input_val()){
@@ -386,11 +404,13 @@ static void swim_send_ack(unsigned char ack){
 
 static swim_handle_t swim_send_unit(unsigned char data, unsigned char len, unsigned int retry){
 		signed char i;
-		register unsigned char p, m;
+		unsigned char p, m;
 		char ack = 0;
 	
   	  	my_ndelay(2750);
 		
+		swim_set_as_output_high();
+		my_ndelay(1000);
 		do {
 			send_swim_bit(0);
 			p = 0;
@@ -399,27 +419,54 @@ static swim_handle_t swim_send_unit(unsigned char data, unsigned char len, unsig
 				send_swim_bit(m);
 				p += m;
 			}
-			spin_lock_irq(&pp->spinlock);
 			send_swim_bit(p&1);		// parity bit
-			spin_unlock_irq(&pp->spinlock);
+
 			
+			swim_set_as_input();
 			ack = rvc_swim_bit();
 			if (ack == -1){
-				hensen_debug("Error: ACK failed!\n");
-				return SWIM_TIMEOUT;
+				printk(KERN_ERR "Error: ACK failed!\n");
+				ack = 1;
 			}
+			
 		} while (!ack && retry--);
 		
 		return ack ? SWIM_OK : SWIM_FAIL;
-	}
-
-
-
-static swim_handle_t swim_soft_reset(void)
-{
-    return swim_send_unit(SWIM_CMD_SRST, SWIM_CMD_LEN, SWIM_MAX_RESEND_CNT);
 }
 
+static swim_handle_t swim_bus_write_new(unsigned int addr, unsigned char *buf, unsigned int size){
+
+	unsigned int i = 0;
+	
+	if(swim_send_unit(SWIM_CMD_WOTF, SWIM_CMD_LEN, SWIM_MAX_RESEND_CNT))return SWIM_FAIL;
+	
+	if(swim_send_unit(size, 8, 0))return SWIM_FAIL; //n
+	if(swim_send_unit((addr >> 16) & 0xFF, 8, 0))return SWIM_FAIL; //@E
+	if(swim_send_unit((addr >> 8) & 0xFF, 8, 0))return SWIM_FAIL;	//H
+	if(swim_send_unit((addr >> 0) & 0xFF, 8, 0));	//L
+
+
+	for (i = 0; i < size; i++){
+	//	if(!(i%8))
+			//printk(KERN_ALERT "ADDR(%#X): %2X %2X %2X %2X %2X %2X %2X %2X\n", addr+i, buf[i+0], buf[i+1], buf[i+2], buf[i+3], buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+		if(swim_send_unit(buf[i], 8, SWIM_MAX_RESEND_CNT))break;
+	}
+
+	if(i<size)return SWIM_FAIL;
+	
+	return SWIM_OK;
+}
+
+
+
+static swim_handle_t swim_soft_reset(void){
+	swim_handle_t ret;
+	
+    ret = swim_send_unit(SWIM_CMD_SRST, SWIM_CMD_LEN, SWIM_MAX_RESEND_CNT);
+	swim_set_as_output_high();
+	
+	return ret;
+}
 
 static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
 {
@@ -427,6 +474,7 @@ static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
     unsigned char s = 0, p = 0, cp = 0;
     char ack = 0;
 	
+	swim_set_as_input();
     for (i=0; i<len+2; i++)
     {
         ack = rvc_swim_bit();
@@ -455,6 +503,7 @@ static swim_handle_t swim_rcv_unit(unsigned char *data, unsigned char len)
         ack = 1;
     }
 	
+	swim_set_as_output();
     swim_send_ack(ack);
 	
     return ack ? SWIM_OK : SWIM_FAIL;
@@ -506,7 +555,7 @@ static swim_handle_t swim_bus_read(unsigned int addr, unsigned char *buf, unsign
             pp->return_line = __LINE__;
    			return ret;
         }
-        for (i = 0; i < cur_len; i++)
+        for (i = 0; i < cur_len; ++i)
         {
             ret = swim_rcv_unit(buf++, 8);
             if (ret)
@@ -583,7 +632,7 @@ static swim_handle_t swim_bus_write(unsigned int addr, unsigned char *buf, unsig
 			break;
 		}
 		for (i = 0; i < cur_len; i++){
-			ret = swim_send_unit(*buf++, 8, SWIM_MAX_RESEND_CNT);
+			ret = swim_send_unit(buf[i], 8, SWIM_MAX_RESEND_CNT);
 			if (ret){
 				pp->return_line = __LINE__;
 				hensen_debug("Error: send unit data failed.\n");
@@ -603,7 +652,7 @@ static swim_handle_t swim_bus_write(unsigned int addr, unsigned char *buf, unsig
 
 
 
-static swim_handle_t swim_start_entry_new(void){
+static swim_handle_t swim_enter_active(void){
 	int i = 0, ret = SWIM_FAIL;
 	unsigned char ch = 0;
 
@@ -612,11 +661,10 @@ static swim_handle_t swim_start_entry_new(void){
 	mdelay(10);
 	
 	/*1. To make the SWIM active, the SWIM pin must be forced low during a period of 16us*/
-	rst_set_as_output_low();
+	rst_set_as_output_low();	//in rst state first
 	mdelay(10);
 	swim_set_as_output_low();
-	udelay(1000); 	//should be 16us, but 1000us could be better
-
+	udelay(1000); 	//should be lager than 16us, but 1000us is better for this.
 
 	/*2. four pulses at 1 kHz followed by four pulses at 2 kHz.*/
     for (i=0; i<4; i++){
@@ -635,7 +683,6 @@ static swim_handle_t swim_start_entry_new(void){
    // 3. Swim is already in Active State
 	swim_set_as_input();
 	
-
 	//4. Delay for stm8's async ack, about 20us in this For Circle Func totally cost
 	//about 16us low level for swim device ack to MCU
 	 for(i=0; i<RST_CHK_TIMEOUT; i++){
@@ -657,18 +704,17 @@ static swim_handle_t swim_start_entry_new(void){
 	        }
 	    }
 	}
-		
-    //hensen_debug("ret:%d. Send seq header done.\n", ret);
-
+	
 	if(ret){
 		rst_set_as_output_high();
 		printk(KERN_ERR "Error: Wait ACK from stm8 timeout! %s(%d)\n", __func__, __LINE__);
 		goto entry_err0;
 	}
-
+	
+	//hensen_debug("ret:%d. Send seq header done.\n", ret);
 	//5. Before start a SWIM communication, the SWIM line must be release at 1 to guarantee that it's ready for communication(at least 300ns)
-	mdelay(5);
-
+	swim_set_as_output_high();
+	mdelay(10);	//lager than 300ns
 
 #if 0
 	/*SWIM_CSR/RST bit is not yet set. Soft option is meaningless(Active state is stil maintain the Active state).*/
@@ -679,12 +725,11 @@ static swim_handle_t swim_start_entry_new(void){
 		goto entry_err1;
     }
 	
-	mdelay(5);
+	mdelay(30);
 	//hensen_debug("Swim soft reset done.\n");
 #endif
 
-
-
+	//6. get in DM mode
     ch = 0xA0;
     ret = swim_bus_write(SWIM_CSR_ADDR, &ch, 1); 
     if (ret){
@@ -692,35 +737,53 @@ static swim_handle_t swim_start_entry_new(void){
 		printk(KERN_ERR "Error: swim_write failed!\n");
         return ret;
     }
-	//hensen_debug("Swim write SWIM_CSR(0x7f80) 0xA0 done.\n");
-	
-	
+	mdelay(10);
+	//7. release rst, wait more than 1ms
 	rst_set_as_output_high();
 	swim_set_as_output_high();
-
 	mdelay(10);
-	hensen_debug("Swim is ready for you!\n");
-	
-	ch = 0;
-	ret = swim_bus_read(SWIM_CSR_ADDR, &ch, 1); 
-	if (ret){
-	 rst_set_as_output_high();
-	 printk(KERN_ERR "Error: swim_read failed!\n");
-	 return ret;
-	}else{
-	 printk(KERN_ALERT "read addr(%#x)'s data: %#x\n", SWIM_CSR_ADDR, ch);
-	}
+	printk(KERN_ALERT "Swim is in active state now!\n");
 
-
-	
 	return SWIM_OK;
-	
 entry_err1:
 
 entry_err0:
 	return SWIM_TIMEOUT;
 }
 
+
+static swim_handle_t program_boot(unsigned char* buf, unsigned int page_cnt){
+	unsigned char ch = 0;
+	char i = 0;
+	
+	if(page_cnt > ST8S_PAGE_CNT)page_cnt = ST8S_PAGE_CNT;
+	
+	ch = CSR_STALL_CPU;
+	swim_bus_write(DM_CSR2_ADDR, &ch, 1);
+	ch = FLASH_INIT;
+	swim_bus_write(FLASH_PUKR_ADDR, &ch, 1);
+	udelay(1000);
+	ch = UNLOCK_FLASH;
+	swim_bus_write(FLASH_PUKR_ADDR, &ch, 1);
+	mdelay(10);
+	for(i = 0; i<page_cnt; i++){
+		swim_set_as_output_high();
+		my_ndelay(2750);
+		ch = STANDARD_BLOCK;
+		swim_bus_write(FLASH_CR2_ADDR, &ch, 1);
+		swim_set_as_output_high();
+		my_ndelay(2750);
+		ch = BLOCK_PROGRAMING_EN;
+		swim_bus_write(FLASH_NCR2_ADDR, &ch, 1);
+		swim_set_as_output_high();
+		my_ndelay(2750);
+		swim_bus_write_new(0x8000 + i*ST8S_PAGE_SIZE, buf + i*ST8S_PAGE_SIZE, ST8S_PAGE_SIZE);
+		mdelay(10);
+		//printk(KERN_ALERT "-----------hensen_debug------, i=%d\n", i);
+	}
+	
+	return SWIM_OK;
+}
 
 static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	//1. Alloc private date, and add private_date into file
@@ -740,17 +803,32 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	swim_get_reg_val_to_tmp();	//get val to tmp for a tmp store, to prevent a hardware mis opt with a read.
 
 
-	swim_start_entry_new();
+#if 0
+	swim_set_init_output_high();
+	while(1){
+		S_0;
+		S_1;
+	}
+#endif 
 
+	swim_enter_active();
 	
 	hensen_debug();
 	return 0;
 }
 static int stm8_swim_release(struct inode* inodp, struct file* filp){
 	swim_priv_t * priv = filp->private_data;
+	unsigned char ch = 0xa4;
+	
+	swim_bus_write(SWIM_CSR_ADDR, &ch, 1); 
+	mdelay(10);
+	
+	//swim_bus_read(SWIM_CSR_ADDR, &ch, 1); 
 
+	swim_soft_reset();
+	printk(KERN_ALERT "Swim has been reset!\n");
+	
 	swim_free_iomem();
-
 	kfree(priv);
 	priv = NULL;
 	pp = NULL;
@@ -795,14 +873,15 @@ static ssize_t a83t_swim_read(struct file *filp, char __user *buf, size_t count,
 
 static ssize_t a83t_swim_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
 {
-    swim_handle_t ret;
-    unsigned int addr = *ppos;
     unsigned char *kbuf = NULL;
-    
-    kbuf = kmalloc(count, GFP_KERNEL);
+	
+    if(count<=0)return -EINVAL;
+	if(count>ST8S_PAGE_CNT*ST8S_PAGE_SIZE)count = ST8S_PAGE_CNT*ST8S_PAGE_SIZE;
+	
+    kbuf = vmalloc(count);
     if (!kbuf)
     {
-        printk("kmalloc %d bytes fail!\n", count);
+        printk("vmalloc %d bytes fail!\n", count);
         return 0;
     }
 
@@ -812,17 +891,15 @@ static ssize_t a83t_swim_write(struct file *filp, const char __user *buf, size_t
         return 0;
     }
 
-    printk("swim write addr = 0x%x, size = 0x%x\n", addr, count);
+	printk(KERN_ALERT "St8's flash is been writing...\n");
+	
+	count = count/ST8S_PAGE_SIZE + ((count%ST8S_PAGE_SIZE)?1:0);
+	program_boot(kbuf, count);
+	
+	printk(KERN_ALERT "St8's flash has been written!\n");
+	printk(KERN_ALERT "Total write %d PAGE(64bytes/page)!", count);
 
-    local_irq_disable();
-    ret = swim_bus_write(addr, kbuf, count);
-    if (ret)
-    {
-        printk("write fail! ret = %d, priv->return_line = %d\n", ret, pp->return_line);
-    }
-    local_irq_enable();
-
-    kfree(kbuf);
+    vfree(kbuf);
 
     return count;
 }

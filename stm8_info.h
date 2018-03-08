@@ -130,6 +130,7 @@ static inline void swim_pin_high(void){
 #define PD27_PULL_POS	22
 #define PD26_PULL_POS	20
 
+
 #define STM8_SWIM_DEVICE_NAME "swim"
 #define SWIM_CMD_LEN                    3
 #define SWIM_CMD_SRST                   0x00
@@ -149,7 +150,20 @@ static inline void swim_pin_high(void){
 
 
 
-#define SWIM_CSR_ADDR 					0x7F80
+#define SWIM_CSR_ADDR	0x7F80
+#define DM_CSR2_ADDR	0x7f99
+#define FLASH_CR2_ADDR	0x505b
+#define FLASH_NCR2_ADDR	0x505c
+#define FLASH_PUKR_ADDR	0x5062
+
+#define CSR_STALL_CPU	0x08
+#define FLASH_INIT		0x56
+#define UNLOCK_FLASH	0xae
+#define STANDARD_BLOCK	0x01
+#define BLOCK_PROGRAMING_EN		0xfe
+
+#define ST8S_PAGE_CNT 128
+#define ST8S_PAGE_SIZE 64
 
 typedef struct APP_WITH_KERNEL{
 	unsigned int pwm_ch_ctrl;
@@ -215,7 +229,7 @@ typedef struct SWIM_PRIV_INFO{
 	void* private_date;
 }swim_priv_t;
 
-#if 0	//if000 start
+#if 1	//if000 start
 #define reg_readl(addr)		(*((volatile unsigned long  *)(addr)))
 #define reg_writel(v, addr)		(*((volatile unsigned long  *)(addr)) = (unsigned long)(v))
 #else

@@ -5,7 +5,9 @@
 #include <sys/types.h>  
 #include <fcntl.h>  
 #include <unistd.h>  
-#include <stdlib.h>  
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <errno.h>  
 #include <sys/ioctl.h>
 
@@ -36,13 +38,14 @@ typedef struct APP_WITH_KERNEL{
 #define A83T_SWIM_WRITE_IOCTL		_IOW(A83T_IOCTL_MAGIC, 5, communication_info_t)
 
 
-
 #define DEVICE_NAME "/dev/swim"
 
+//int = strtoul(argv[1], &result, 16);	//0 -> read
+
 int main(int argc, char* argv[]){
-	int fd = -1, ret = -1;
-	unsigned long val = 0;
-	char* result = NULL;
+	int fd = -1, ret = -1, cnt =0;
+	char buf[8192] = {};
+	FILE* fp = NULL;
 	
 	communication_info_t info = {
 		.pwm_ch_ctrl = 0x0,
@@ -61,57 +64,33 @@ int main(int argc, char* argv[]){
 		perror("open /dev/swim failed!\n");
 		return -EAGAIN;
 	}
-
-	#if 1
 	if(argc < 2){
-		printf("Use default val: pwm_ch_ctrl = 0x0, entire_cys = 7, act_cys = 4.\n\t\t\t \
-						Usage: \n\t\t\t \
-							./a.out + 0 + reg_addr  -> read reg_addr\n\t\t\t \
-							./a.out + 1 + reg_addr + data ->write reg_addr data\n");
-						
-		close(fd);
-		return 0;
+		printf("Usage: ./stm8boot + st8bootfile.\n");
+
 	}else{
-		val = strtoul(argv[1], &result, 16);	//0 -> read
-		if(0 == val){
-			val = strtoul(argv[2], &result, 16);
-			info.addr = val;
-		
-			ret = ioctl(fd, A83T_SWIM_READ_IOCTL, (unsigned long)(&info));
-			if(ret){
-				perror("ioctl failed!\n");
-				return ret;
-			}
-			printf("Read:reg(%#x)'s data(%#x).\n", info.addr, info.buf[0]);
-		}else if(1 == val){	//1 -> WRITE
-			val = strtoul(argv[2], &result, 16);
-			info.addr = val;
-			val = strtoul(argv[3], &result, 16);
-			info.buf[0] = (unsigned char)val;
-			
-	
-			ret = ioctl(fd, A83T_SWIM_WRITE_IOCTL, (unsigned long)(&info));
-			if(ret){
-				perror("ioctl failed!\n");
-				return ret;
-			}
-			printf("write addr(%#x), data:(%#x)\n", info.addr, info.buf[0]);
-			
-			sleep(1);
-			ret = ioctl(fd, A83T_SWIM_READ_IOCTL, (unsigned long)(&info));
-			if(ret){
-				perror("ioctl failed!\n");
-				return ret;
-			}
-			printf("Read:reg(%#x)'s data(%#x).\n", info.addr, info.buf[0]);
-
+		fp = fopen(argv[1], "r");
+		bzero(buf, 8192);
+		while(!feof(fp)){
+			buf[cnt++] = fgetc(fp);
+			#if 0
+			printf("%2X ", buf[cnt]);
+			cnt++;
+			if(!(cnt%64))
+				printf("\n");
+			#endif
 		}
+		printf("\n");
+		printf("\n");
+		printf("%s's size is %d bytes.\n", argv[1], cnt);
+		ret = write(fd, buf, cnt);
+		if(ret < 0){
+			perror("Write stm8 failed!\n");
+		}
+		
+		fclose(fp);
 	}
-	#endif 
 
-	
-	//getchar();
-	puts("");
+
 	close(fd);
 	return 0;
 }
