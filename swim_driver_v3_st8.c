@@ -47,6 +47,7 @@
 
 static swim_priv_t* pp = NULL;
 
+#if 0 //test pwm begin
 static  inline void time_ndelay(unsigned int ns){
 	if(!pp)return;
 	
@@ -56,6 +57,75 @@ static  inline void time_ndelay(unsigned int ns){
 	}while((pp->ts[1].tv_nsec-pp->ts[0].tv_nsec) < ns);
 	
 }
+#else
+
+static void __iomem* pwm_get_iomem(void){
+
+	void __iomem* vaddr = ioremap(PWM_BASE_ADDR, PAGE_ALIGN(PWM_CH1_PERIOD_OFFSET));
+	if(!vaddr){
+		printk(KERN_ERR "Error: ioremap for %s failed!\n", __func__);
+		return NULL;
+	}
+	pp->pwm_base_vaddr = vaddr;
+	pp->pwm_ch_ctrl = pp->pwm_base_vaddr + PWM_CH_CTRL_OFFSET;
+	pp->pwm_ch0_period = pp->pwm_base_vaddr + PWM_CH0_PERIOD_OFFSET;
+	pp->pwm_ch1_period = pp->pwm_base_vaddr + PWM_CH1_PERIOD_OFFSET;
+
+
+	return vaddr;
+}
+static void pwm_free_iomem(void){
+	if(pp->pwm_base_vaddr){
+		iounmap(pp->pwm_base_vaddr);
+		pp->pwm_base_vaddr = NULL;
+	}
+}
+
+
+
+/*
+ * enable: 1:enable pwm_ch0, 0: disable pwm_ch0
+ * prescal: This bts should be setting before the PWM Channel 0 clock gate on.
+			 * 0000:/120	0001:/180	0010:/240	0011:/360
+			 * 0100:/480	0101:/		0110:/		0111:/
+			 * 1000:/12k	1001:/24k	1010:/36k	1011:/48k
+			 * 1100:/72k	1101:/		1110:/		1111:/1
+ * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
+ * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
+*/
+static inline int pwm_pulse_set(unsigned int enable, unsigned int pulse_state, unsigned int  entire_cys, unsigned int pulse_width){
+	unsigned int val = 0;
+	
+	if(!enable){
+		reg_writel(0x0<<PWM_CH0_EN_POS, pp->pwm_ch_ctrl);
+		return 0;
+	}else{
+		val = (PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (pulse_state<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS);
+		reg_writel(val, pp->pwm_ch_ctrl);
+		reg_writel(((entire_cys&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((pulse_width&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
+		reg_writel(val | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
+	}
+
+	return 0;
+}
+static void pwm_pulse_low(unsigned int pulse_width){
+    // pulse like this： ---|_low__|, 1/24 us as each pulse time.
+    //  0 =< pulse_width <= 65534
+    reg_writel((((pulse_width-1)&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((pulse_width&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
+	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
+	while(1){	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+		if(!((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1))break;
+	}
+
+	
+}
+
+static void time_ndelay(unsigned int ns){
+	if(ns<42)ns=42;	// because of OSC is 24MHZ, and 1000/24 < 42.
+	pwm_pulse_low(ns*24/1000);
+}
+
+#endif  //test pwm end
 
 static void __iomem* pd_get_iomem(void){
 	void __iomem* vaddr = ioremap(PORT_IO_BASEADDR, PAGE_ALIGN(PD_PULL1_REG_OFFSET));
@@ -124,7 +194,7 @@ static inline void swim_set_input(void){
 	reg_writel((pp->pd_cfg3_reg_tmp & (~(0x7 << PD27_SELECT_POS))) | (0x0 << PD27_SELECT_POS), pp->pd_cfg3_reg);
 }
 
-static inline unsigned int swim_get_input_val(void){
+static unsigned int swim_get_input_val(void){
 	return ((reg_readl(pp->pd_data_reg) >> PD27_DATA_POS) & 0x1);
 }
 
@@ -145,7 +215,8 @@ static inline void swim_send_bit(unsigned char bit){
 static int swim_send_unit(unsigned char data, unsigned char len){
 	signed char i=0, j=0, retry=1, cnt=0;
 	unsigned char p=0, m=0;
-	
+#define SWIM_SEND_CHECK_TIMEOUT 300
+
 	for(retry=1; retry>0; retry--){
 		swim_set_output_high();
 		swim_send_bit(0);
@@ -157,16 +228,18 @@ static int swim_send_unit(unsigned char data, unsigned char len){
 		}
 		swim_send_bit(p&1);		// parity bit
 		
-		cnt = 0;
 		swim_set_input();		//check ack
-		while(swim_get_input_val()){
-			if(cnt++ > 160)break;
+		for(cnt=0; cnt<SWIM_SEND_CHECK_TIMEOUT; cnt++){
+			if(!swim_get_input_val())
+				break;
 		}
-		if(cnt>160){
-			retry = 1;
-			if(j++ > 10)return 1;
+		if(cnt>SWIM_SEND_CHECK_TIMEOUT){
+			j++;
 			printk(KERN_ALERT "St8 Bug: No ack.try again...\n");
-			continue;
+			if(j > 3)
+				return -1;
+			else
+				continue;
 		}
 		time_ndelay(1000);	//125*8ns
 		if(swim_get_input_val())break;
@@ -198,7 +271,7 @@ static int swim_write_buf(unsigned int addr, char* buf, unsigned int n){
 	if(swim_send_unit(addr&0xff, 8))return -5;		//@L
 	for(i=0; i<n; i++){
 		if(!(i%8))
-			printk(KERN_ALERT "addr(%#x - %#x):%#x %#x %#x %#x %#x %#x %#x %#x.\n", addr, addr+i, buf[i], buf[i+1], buf[i+2], buf[i+3], buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+			printk(KERN_ALERT "addr(%#x-%#x):|%#x %#x %#x %#x %#x %#x %#x %#x|\n", addr+i, addr+i+7, buf[i], buf[i+1], buf[i+2], buf[i+3], buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
 		if(swim_send_unit(buf[i], 8))break;
 	}
 	if(i<n)return -6;
@@ -230,17 +303,29 @@ static int swim_srst(void){
 
 static int active_st8_dm_mode(void){
 	int ret = -1;
-	
+#define SEQUENCE_ACK_TIMEOUT 3000
+#define SEQUENCE_ACK_WRONG	1000
+
 	rst_set_output_low();
 	mdelay(10);		//1. rst first
 	swim_set_output_low();
 	mdelay(1);		//2. >16us
 	
 	entry_sequence();	//3. enter seq
-	
+
+	ret = 0;
 	swim_set_input();
-	while(swim_get_input_val());
-	while(!swim_get_input_val());	//4. Wait for 128*HSI, 16us
+	for(ret=0; ret<SEQUENCE_ACK_TIMEOUT; ret++){
+		if(!swim_get_input_val())break;
+	}
+	if(ret>=SEQUENCE_ACK_TIMEOUT)
+		return -1;
+	for(ret=0; ret<SEQUENCE_ACK_WRONG; ret++){	//4. Wait for 128*HSI, 16us
+		if(swim_get_input_val())break;
+	}
+	if(ret>=SEQUENCE_ACK_WRONG)
+		return -2;
+	
 	swim_set_output_high();
 	mdelay(5);	//5. >300ns
 	
@@ -254,7 +339,7 @@ static int active_st8_dm_mode(void){
 	ret = swim_write_byte(0x7f80, 0xa0);
 	if(ret){
 		printk(KERN_ERR "Set as DM mode failed(ret:%d)!\n", ret);
-		return -2;
+		return -3;
 	}
 	mdelay(10);
 	rst_set_output_high();
@@ -268,6 +353,7 @@ static int active_st8_dm_mode(void){
 static int program_boot(char* buf, unsigned int page_cnt){
 	unsigned int i = 0;
 	
+	spin_lock_irq(&pp->spinlock);
 	if(swim_write_byte(0x7f99, 0x08))return -1;
 	if(swim_write_byte(0x5062, 0x56))return -2;
 	mdelay(1);
@@ -279,6 +365,7 @@ static int program_boot(char* buf, unsigned int page_cnt){
 		if(swim_write_buf(0x8000+i*64, buf+i*64, 64))return -6;
 		mdelay(10);
 	}
+	spin_unlock_irq(&pp->spinlock);
 	
 	return 0;
 }
@@ -295,9 +382,11 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 
 	//2. get swim_pin iomap
 	if(!pd_get_iomem())return -ENOMEM;
-
+	if(!pwm_get_iomem())return -ENOMEM;
+	
 	swim_get_reg_val_to_tmp();	//get val to tmp for a tmp store, to prevent a hardware mis opt with a read.
 
+	
 	active_st8_dm_mode();
 
 	hensen_debug();
@@ -317,7 +406,8 @@ static int stm8_swim_release(struct inode* inodp, struct file* filp){
 		return -4;
 	}
 
-
+	
+	pwm_free_iomem();
 	pd_free_iomem();
 	kfree(priv);
 	priv = NULL;
@@ -331,7 +421,7 @@ static ssize_t a83t_swim_write(struct file *filp, const char __user *buf, size_t
 {
 	unsigned int page_cnt = 0;
     unsigned char *kbuf = NULL;
-	unsigned int cnt = 0;
+	unsigned int ret = 0;
 	
     if(count<=0)return -EINVAL;
 	if(count>ST8S_PAGE_CNT*ST8S_PAGE_SIZE)count = ST8S_PAGE_CNT*ST8S_PAGE_SIZE;
@@ -350,9 +440,9 @@ static ssize_t a83t_swim_write(struct file *filp, const char __user *buf, size_t
     }
 	page_cnt = count/64 + (((count%64) > 0)?1:0);
 	printk(KERN_ALERT "count:%d, page_cnt:%d\n", count, page_cnt);
-	cnt = program_boot(kbuf, page_cnt);
-	if(cnt)
-		printk(KERN_ALERT "Error: program_boot failed!(ret:%d)\n", cnt);
+	ret = program_boot(kbuf, page_cnt);
+	if(ret)
+		printk(KERN_ALERT "Error: program_boot failed!(ret:%d)\n", ret);
 
 
     kfree(kbuf);

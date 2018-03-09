@@ -35,6 +35,52 @@
 #define PD27_PULL_POS	22
 #define PD26_PULL_POS	20
 
+#define PWM "PD28"
+#define PWM_BASE_ADDR 0x01C21400
+#define PWM_CH_CTRL_OFFSET 0x00
+#define PWM_CH0_PERIOD_OFFSET 0x04
+#define PWM_CH1_PERIOD_OFFSET 0x08
+
+#define PWM0_RDY_POS 		28	//0: pwm0 period reg is ready to write, 1:busy
+#define PWM0_BYPASS_POS 	9	//0: disable ch0 bypass, 1: ch0 OSC24Mhz  enable
+#define PWM_CH0_PUL_START_POS	8	//0: no effect, 1: output 1 pulse( pulse width ref on period 0 register [15:0])
+#define PWM_CHANNEL0_MODE_POS	7	//0:cycle mode, 1: pulse mode
+#define SCLK_CH0_GATING_POS	6	//0: mask, 1: pass. gating the special clock for pwm0
+#define PWM_CH0_ACT_STA_POS	5	//0:low level, 1: high level. pwm ch0 active state
+#define PWM_CH0_EN_POS	4	//0:disable, 1:enable. pwm ch0 enable 
+#define PWM_CH0_PRESCAL_POS	0	//PWM ch0 prescalar
+#define PWM_CH0_PRESCAL_BITFIELDS_MASK	0xf
+/* This bts should be setting before the PWM Channel 0 clock gate on.
+ * 0000:/120	0001:/180	0010:/240	0011:/360
+ * 0100:/480	0101:/		0110:/		0111:/
+ * 1000:/12k	1001:/24k	1010:/36k	1011:/48k
+ * 1100:/72k	1101:/		1110:/		1111:/1
+*/
+#define PWM_CH0_PRESCAL_VAL	0xf
+
+/*Note: If the register need to modified dynamically, the PCLK should be faster than the PWM CLK 
+ * 
+ * (PWM CLK = 24MHz/pre-scale)
+ *
+*/
+#define PWM_CH0_ENTIRE_CYS_POS	16	//0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
+#define PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK	0xffff
+#define PWM_CH0_ENTIRE_ACT_CYS_POS	0	//	//0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the active cycles in the PWM clock)
+#define PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK	0xffff
+
+#define CYCLE_MODE 0x0
+#define PULSE_MODE 0x1
+#define ENTIRE_CYS_CNT 0x42		//22*3 = 16*4 + 2 = 0x42
+#define ACT_CYS_CNT0	0x3c	//20*3 = 60 = 0x3c
+#define ACT_CYS_CNT1	0x6		//2*3 = 6 = 0x6
+#define ACT_CYS_CNT3	0X3		//1*3 = 3 = 0X3
+#define ACT_CYS_CNT2	0xc		//4*3 = 12 = 0xc
+#define ACT_CYS_CNT_CLEAR 0x1
+#define ACT_CYS_CNT_ZERO 0x0
+
+#define PULSE_STATE_LOW 0x0
+#define PULSE_STATE_HIGH 0x1
+
 
 #define STM8_SWIM_DEVICE_NAME "swim"
 #define SWIM_CMD_LEN                    3
@@ -116,6 +162,11 @@ typedef struct SWIM_PRIV_INFO{
 	unsigned int	pd_data_reg_tmp;
 	unsigned int	pd_drv1_reg_tmp;
 	unsigned int	pd_pull1_reg_tmp;
+
+	void __iomem*  pwm_base_vaddr;
+	void __iomem*  pwm_ch_ctrl;
+	void __iomem*  pwm_ch0_period;
+	void __iomem*  pwm_ch1_period;
 
 
 	unsigned int return_line;
