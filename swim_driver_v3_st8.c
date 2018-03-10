@@ -47,7 +47,9 @@
 
 static swim_priv_t* pp = NULL;
 
-#if 0 //test pwm begin
+//#define DONT_USE_PWM_AS_TIMEER 1
+
+#ifdef DONT_USE_PWM_AS_TIMEER //test pwm begin
 static  inline void time_ndelay(unsigned int ns){
 	if(!pp)return;
 	
@@ -82,42 +84,20 @@ static void pwm_free_iomem(void){
 }
 
 
-
-/*
- * enable: 1:enable pwm_ch0, 0: disable pwm_ch0
- * prescal: This bts should be setting before the PWM Channel 0 clock gate on.
-			 * 0000:/120	0001:/180	0010:/240	0011:/360
-			 * 0100:/480	0101:/		0110:/		0111:/
-			 * 1000:/12k	1001:/24k	1010:/36k	1011:/48k
-			 * 1100:/72k	1101:/		1110:/		1111:/1
- * entire_cys: 0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the entire cycles in the PWM clock)
- * act_cys: //0:1cycle, 1:2cycles, ..., n: n+1cycles(Number of the act cycles in the PWM clock)
-*/
-static inline int pwm_pulse_set(unsigned int enable, unsigned int pulse_state, unsigned int  entire_cys, unsigned int pulse_width){
-	unsigned int val = 0;
-	
-	if(!enable){
-		reg_writel(0x0<<PWM_CH0_EN_POS, pp->pwm_ch_ctrl);
-		return 0;
-	}else{
-		val = (PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (pulse_state<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS);
-		reg_writel(val, pp->pwm_ch_ctrl);
-		reg_writel(((entire_cys&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((pulse_width&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
-		reg_writel(val | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
-	}
-
-	return 0;
-}
 static void pwm_pulse_low(unsigned int pulse_width){
     // pulse like this： ---|_low__|, 1/24 us as each pulse time.
     //  0 =< pulse_width <= 65534
+    int i = 0;
+#define PWM_TIMER_TIMEOUT 1000
     reg_writel((((pulse_width-1)&PWM_CH0_ENTIRE_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_CYS_POS) | ((pulse_width&PWM_CH0_ENTIRE_ACT_CYS_BITFIELDS_MASK)<<PWM_CH0_ENTIRE_ACT_CYS_POS), pp->pwm_ch0_period);
 	reg_writel((PULSE_MODE<<PWM_CHANNEL0_MODE_POS) | (PULSE_STATE_LOW<<PWM_CH0_ACT_STA_POS) | ((PWM_CH0_PRESCAL_VAL&PWM_CH0_PRESCAL_BITFIELDS_MASK)<<PWM_CH0_PRESCAL_POS) | (0x1<<PWM_CH0_PUL_START_POS) | (0x1<<SCLK_CH0_GATING_POS) | (0x1<<PWM_CH0_EN_POS), pp->pwm_ch_ctrl);
 	while(1){	//	wait for PWM_CH0_PUL_START_POS bit cleared automatically(After the pulse is finished.).
+		if(i++>PWM_TIMER_TIMEOUT){
+			printk(KERN_ERR "Error:pwm func dismiss!\n");
+			break;
+		}
 		if(!((reg_readl(pp->pwm_ch_ctrl)>>PWM_CH0_PUL_START_POS)&0x1))break;
 	}
-
-	
 }
 
 static void time_ndelay(unsigned int ns){
@@ -236,17 +216,18 @@ static int swim_send_unit(unsigned char data, unsigned char len){
 		if(cnt>SWIM_SEND_CHECK_TIMEOUT){
 			j++;
 			printk(KERN_ALERT "St8 Bug: No ack.try again...\n");
-			if(j > 3)
+			if(j > 3){
+				swim_set_output_high();
 				return -1;
-			else
+			}else
 				continue;
 		}
 		time_ndelay(1000);	//125*8ns
 		if(swim_get_input_val())break;
 		time_ndelay(1750);
 	}
-	swim_set_output_high();
 	
+	swim_set_output_high();
 	return (retry<=0);
 }
 
@@ -329,7 +310,7 @@ static int active_st8_dm_mode(void){
 	swim_set_output_high();
 	mdelay(5);	//5. >300ns
 	
-#if 0
+#if 0	//in this point srst is inavailable.
 	if(swim_srst()){
 		printk(KERN_ERR "ERROR: Swim soft rst failed!\n");
 		return -1;
@@ -378,12 +359,13 @@ static int stm8_swim_open(struct inode* inodp, struct file* filp){
 	}
 	filp->private_data = priv;
 	pp = priv;
-	spin_lock_init(&pp->spinlock);	
 
 	//2. get swim_pin iomap
 	if(!pd_get_iomem())return -ENOMEM;
-	if(!pwm_get_iomem())return -ENOMEM;
 	
+#ifndef DONT_USE_PWM_AS_TIMEER
+	if(!pwm_get_iomem())return -ENOMEM;
+#endif
 	swim_get_reg_val_to_tmp();	//get val to tmp for a tmp store, to prevent a hardware mis opt with a read.
 
 	
@@ -406,8 +388,9 @@ static int stm8_swim_release(struct inode* inodp, struct file* filp){
 		return -4;
 	}
 
-	
+#ifndef DONT_USE_PWM_AS_TIMEER
 	pwm_free_iomem();
+#endif
 	pd_free_iomem();
 	kfree(priv);
 	priv = NULL;
