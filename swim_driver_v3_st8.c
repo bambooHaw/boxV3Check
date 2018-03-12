@@ -60,7 +60,6 @@ static  inline void time_ndelay(unsigned int ns){
 	
 }
 #else
-
 static void __iomem* pwm_get_iomem(void){
 
 	void __iomem* vaddr = ioremap(PWM_BASE_ADDR, PAGE_ALIGN(PWM_CH1_PERIOD_OFFSET));
@@ -251,10 +250,13 @@ static int swim_write_buf(unsigned int addr, char* buf, unsigned int n){
 	if(swim_send_unit((addr>>8)&0xff, 8))return -4;		//@H
 	if(swim_send_unit(addr&0xff, 8))return -5;		//@L
 	for(i=0; i<n; i++){
+		#if 0
 		if(!(i%8))
 			printk(KERN_ALERT "addr(%#x-%#x):|%#x %#x %#x %#x %#x %#x %#x %#x|\n", addr+i, addr+i+7, buf[i], buf[i+1], buf[i+2], buf[i+3], buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+		#endif
 		if(swim_send_unit(buf[i], 8))break;
 	}
+	
 	if(i<n)return -6;
 	
 	return 0;
@@ -326,7 +328,6 @@ static int active_st8_dm_mode(void){
 	rst_set_output_high();
 	mdelay(10);		//7. release rst > 1ms
 
-	hensen_debug();
 	return 0;
 }
 
@@ -334,7 +335,7 @@ static int active_st8_dm_mode(void){
 static int program_boot(char* buf, unsigned int page_cnt){
 	unsigned int i = 0;
 	
-	spin_lock_irq(&pp->spinlock);
+	spin_lock_irqsave(&pp->spinlock, pp->irqflags);
 	if(swim_write_byte(0x7f99, 0x08))return -1;
 	if(swim_write_byte(0x5062, 0x56))return -2;
 	mdelay(1);
@@ -346,46 +347,74 @@ static int program_boot(char* buf, unsigned int page_cnt){
 		if(swim_write_buf(0x8000+i*64, buf+i*64, 64))return -6;
 		mdelay(10);
 	}
-	spin_unlock_irq(&pp->spinlock);
+	spin_unlock_irqrestore(&pp->spinlock, pp->irqflags);
 	
 	return 0;
 }
 static int stm8_swim_open(struct inode* inodp, struct file* filp){
+	int err = 0;
+	
 	//1. Alloc private date, and add private_date into file
 	swim_priv_t* priv = kzalloc(sizeof(swim_priv_t), GFP_KERNEL);
 	if(!priv){
 		printk(KERN_ERR "Kzalloc for swim_priv failed!\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto swim_open_err0;
 	}
 	filp->private_data = priv;
 	pp = priv;
 
 	//2. get swim_pin iomap
-	if(!pd_get_iomem())return -ENOMEM;
+	if(!pd_get_iomem()){
+		printk(KERN_ERR "pd_get_iomem failed!\n");
+		err = -ENOMEM;
+		goto swim_open_err1;
+	}
 	
 #ifndef DONT_USE_PWM_AS_TIMEER
-	if(!pwm_get_iomem())return -ENOMEM;
+	if(!pwm_get_iomem()){
+		printk(KERN_ERR "pwm_get_iomem failed!\n");
+		err = -ENOMEM;
+		goto swim_open_err2;
+	}
 #endif
 	swim_get_reg_val_to_tmp();	//get val to tmp for a tmp store, to prevent a hardware mis opt with a read.
 
 	
-	active_st8_dm_mode();
+	if(active_st8_dm_mode()){
+		printk(KERN_ERR "active_st8_dm_mode failed!\n");
+		err = -EAGAIN;
+		goto swim_open_err3;
+	}
 
-	hensen_debug();
+
 	return 0;
+
+swim_open_err3:
+#ifndef DONT_USE_PWM_AS_TIMEER
+	pwm_free_iomem();
+#endif
+swim_open_err2:
+	pd_free_iomem();
+swim_open_err1:
+	kfree(priv);
+	priv = NULL;
+	pp = NULL;
+swim_open_err0:
+	return err;
 }
 static int stm8_swim_release(struct inode* inodp, struct file* filp){
 	swim_priv_t * priv = filp->private_data;
-	int ret = -1;
-
-	if(swim_write_byte(0x7f80, 0xa4)){
+	int ret = 0;
+	ret = swim_write_byte(0x7f80, 0xa4);
+	if(ret){
 		printk(KERN_ERR "Ready for rst failed!\n");
-		return -3;
+		goto release_write_err;
 	}
 	ret = swim_srst();
 	if(ret){
 		printk(KERN_ERR "ERROR: Swim soft rst failed(ret:%d)!\n", ret);
-		return -4;
+		goto release_srst_err;
 	}
 
 #ifndef DONT_USE_PWM_AS_TIMEER
@@ -395,9 +424,20 @@ static int stm8_swim_release(struct inode* inodp, struct file* filp){
 	kfree(priv);
 	priv = NULL;
 	pp = NULL;
-	
-	hensen_debug();
-	return 0;
+
+	return ret;
+
+release_srst_err:
+release_write_err:
+#ifndef DONT_USE_PWM_AS_TIMEER
+	pwm_free_iomem();
+#endif
+	pd_free_iomem();
+	kfree(priv);
+	priv = NULL;
+	pp = NULL;
+
+	return ret;
 }
 
 static ssize_t a83t_swim_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
@@ -410,27 +450,34 @@ static ssize_t a83t_swim_write(struct file *filp, const char __user *buf, size_t
 	if(count>ST8S_PAGE_CNT*ST8S_PAGE_SIZE)count = ST8S_PAGE_CNT*ST8S_PAGE_SIZE;
 	
     kbuf = kzalloc(count, GFP_KERNEL);
-    if (!kbuf)
-    {
-        printk("vmalloc %d bytes fail!\n", count);
-        return 0;
+    if (!kbuf){
+    	ret = -ENOMEM;
+        printk(KERN_ERR "kzalloc %d bytes fail!\n", count);
+		goto wrtie_kzalloc_err;
     }
 
-    if (copy_from_user(kbuf, buf, count))
-    {
-        printk("copy_from_user fail!\n");
-        return 0;
+    if (copy_from_user(kbuf, buf, count)){
+		ret = -EACCES;
+        printk("copy_from_user fail!\n");\
+        goto write_copy_err;
     }
 	page_cnt = count/64 + (((count%64) > 0)?1:0);
-	printk(KERN_ALERT "count:%d, page_cnt:%d\n", count, page_cnt);
+	//hensen_debug("count:%d, page_cnt:%d\n", count, page_cnt);
+	
 	ret = program_boot(kbuf, page_cnt);
-	if(ret)
+	if(ret){
 		printk(KERN_ALERT "Error: program_boot failed!(ret:%d)\n", ret);
-
+		goto write_program_boot_err;
+	}
 
     kfree(kbuf);
-
     return count;
+
+write_program_boot_err:
+write_copy_err:
+	kfree(kbuf);
+wrtie_kzalloc_err:
+	return ret;
 }
 
 

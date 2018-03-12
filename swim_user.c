@@ -65,27 +65,27 @@ int main(int argc, char* argv[]){
 		return -EAGAIN;
 	}
 	if(argc < 2){
-		printf("Usage: ./stm8boot + st8bootfile.\n");
+		printf("Usage: ./stm8boot + st8bootfilename.\n");
 
 	}else{
 		fp = fopen(argv[1], "r");
 		bzero(buf, 8192);
 		while(!feof(fp)){
 			buf[cnt++] = fgetc(fp);
-			#if 0
-			printf("%2X ", buf[cnt]);
-			cnt++;
-			if(!(cnt%64))
-				printf("\n");
-			#endif
 		}
+		#if 0
 		printf("\n");
 		printf("\n");
 		printf("%s's size is %d bytes.\n", argv[1], cnt);
+		printf("Begin to writting...\n");
+		#endif
+		
 		ret = write(fd, buf, cnt);
 		if(ret < 0){
 			perror("Write stm8 failed!\n");
-		}
+		}else{
+			;//printf("stm8 flash has been written successfully.\n");
+		}	
 		
 		fclose(fp);
 	}
