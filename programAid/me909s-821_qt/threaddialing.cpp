@@ -378,7 +378,8 @@ int threadDialing::initUartAndTryCommunicateWith4GModule_ForTest(int* fdp, char*
         ERR_RECORDER("nodePath couldn't be NULL.");
     }else
     {
-        strcpy(nodePath, devNodePath);
+        //strcpy(nodePath, devNodePath);
+        ret = tryGetDevicenodeName(nodePath, 128, (char*)HUAWEI_LTE_TTYPORT_INFO);
         ret = initSerialPortForTtyLte(fdp, nodePath, BOXV3_BAUDRATE_UART, 1, 3);
         if(!ret)
         {
@@ -490,7 +491,10 @@ char *threadDialing::cutAskFromKeyLine(char *keyLine, int keyLineLen, const char
 int threadDialing::tryAccessDeviceNode(int* fdp, char* nodePath, int nodeLen)
 {
     int ret = 0;
-    ret = parseConfigFile(nodePath, nodeLen, (char*)"NODENAME");
+    //ret = parseConfigFile(nodePath, nodeLen, (char*)"NODENAME"); //use this when udev works well
+
+    ret = tryGetDevicenodeName(nodePath, nodeLen, (char*)HUAWEI_LTE_TTYPORT_INFO);
+
     if(!ret)
     {
         if(*fdp > 2)
@@ -519,6 +523,95 @@ int threadDialing::parseConfigFile(char* nodePath, int bufLen, char *key)
     {
         ret = -ENOMEM;
         ERR_RECORDER(NULL);
+    }
+
+    return ret;
+}
+
+int threadDialing::tryGetDevicenodeName(char *nodePath, int bufLen, char *key)
+{
+    int ret = -ENODATA;
+    DIR *pppdir=NULL, *ppdir=NULL, *pdir=NULL;
+    struct dirent *ptr=NULL, *tr=NULL, *r=NULL;
+    char tmp_buf[32] = {};
+
+
+    if(!nodePath) return -EINVAL;
+
+    bzero(nodePath, bufLen);
+
+    //GET parent dir, of the devdir
+    //3-1:2.2
+    if(NULL == (pppdir = opendir(BOXV3_SYS_USB_DEVICES)))
+    {
+        ERR_PRINTF("open %s failed.", BOXV3_SYS_USB_DEVICES);
+        ret = -EIO;
+    }else
+    {
+        //entry every dir of "devices"
+        while ((ptr=readdir(pppdir)) != NULL)
+        {
+            //find usb bus "3-1"
+            if(strstr(ptr->d_name, BOXV3_4G_USB_BUS))
+            {
+                bzero(tmp_buf, sizeof(tmp_buf));
+                strcpy(tmp_buf, BOXV3_SYS_USB_DEVICES);
+                strcat(tmp_buf, "/");
+                strcat(tmp_buf, ptr->d_name);
+                DEBUG_PRINTF("dir:%s.", tmp_buf);
+                //get child dir
+                if(NULL != (ppdir = opendir(tmp_buf)))
+                {
+                    //find interface info
+                    while(NULL != (tr = readdir(ppdir)))
+                    {
+                        if(strstr(tr->d_name, "interface"))
+                        {
+                            QFile file(QString(BOXV3_SYS_USB_DEVICES)+QString("/")\
+                                       +QString(ptr->d_name)+QString("/")\
+                                       +QString(tr->d_name));
+                            if(!file.open(QIODevice::ReadOnly))
+                            {
+                                ret = -EIO;
+                                ERR_PRINTF("Error: Cant't open %s", file.fileName().toLocal8Bit().data());
+                            }else
+                            {
+                                QTextStream io(&file);
+                                QString str = io.readAll();
+                                file.close();
+                                DEBUG_PRINTF("interface: %s", str.toLocal8Bit().data());
+                                if(str.contains(key))
+                                {
+                                    DEBUG_PRINTF("contains:%s", key);
+                                    //get the name
+                                    bzero(tmp_buf, sizeof(tmp_buf));
+                                    strcpy(tmp_buf, BOXV3_SYS_USB_DEVICES);
+                                    strcat(tmp_buf, "/");
+                                    strcat(tmp_buf, ptr->d_name);
+                                    if(NULL != (pdir = opendir(tmp_buf)))
+                                    {
+                                        while(NULL != (r = readdir(pdir)))
+                                        {
+                                            DEBUG_PRINTF("d_name:%s", r->d_name);
+                                            if(strstr(r->d_name, "ttyUSB"))
+                                            {
+                                                strcpy(nodePath, "/dev/");
+                                                strcat(nodePath, r->d_name);
+                                                DEBUG_PRINTF("nodePath:%s", nodePath);
+                                                ret = 0;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if(strlen(nodePath) > 0) break;
+                }
+            }
+        }
     }
 
     return ret;
@@ -1617,7 +1710,6 @@ int threadDialing::slotMonitorTimerHandler()
 {
     int ret = 0;
 
-    monitorTimer.stop();
     //dynamic check
     DEBUG_PRINTF("isDialedSuccess: %d.", dialingInfo.isDialedSuccess);
 
@@ -1635,23 +1727,13 @@ int threadDialing::slotMonitorTimerHandler()
     DEBUG_PRINTF("tryCount:%d", gData.tryCount);
     if(TRY_COUNT_INFINITE_SIGN != gData.tryCount)
     {
-        if(--gData.tryCount > 0)
-        {
-            (STAGE_RESULT_SUCCESS != dialingInfo.isDialedSuccess)?\
-                        monitorTimer.start(MONITOR_INTERVEL(REFRESH_INTERVEL)):\
-                        monitorTimer.start();
-        }else
+        if(--gData.tryCount <= 0)
         {
             //stop the process
             QCoreApplication::processEvents();
             sleep(1);
             emergency_sighandler(SIGUSR1);
         }
-    }else
-    {
-        (STAGE_RESULT_SUCCESS != dialingInfo.isDialedSuccess)?\
-                    monitorTimer.start(MONITOR_INTERVEL(REFRESH_INTERVEL)):\
-                    monitorTimer.start();
     }
 
     return ret;
@@ -2194,6 +2276,7 @@ int threadDialing::getApnNodeListFromConfigFile(const char *xmlPath)
         ret = tryCreateDefaultXMLConfigFile(xmlPath);
         if((-EAGAIN == ret) || (0 == ret))
         {
+            ret = 0;
             DEBUG_PRINTF();
             if(!parseWholeXMLConfigFileAndGenerateNodeList(xmlPath, &apnNodeList, mutexInfo))
             {
@@ -2220,9 +2303,12 @@ int threadDialing::getApnNodeListFromConfigFile(const char *xmlPath)
 
 void threadDialing::run()
 {
+    QTimer monitorTimer;
+
     QObject::connect(&monitorTimer, &QTimer::timeout, this, &threadDialing::slotMonitorTimerHandler, Qt::QueuedConnection);
 
-    monitorTimer.start();
+    this->slotMonitorTimerHandler();
+    monitorTimer.start(MONITOR_INTERVEL(REFRESH_INTERVEL));
 
     exec();
 }

@@ -19,6 +19,7 @@
 #include <QTimer>
 #include <QMutex>
 #include <QCoreApplication>
+#include <QFile>
 
 #include "global.h"
 
@@ -49,6 +50,7 @@ public:
     void initOutputFiles(void);
     void clearSimStatesOfOutputFiles(char simSt = 0);
     int parseConfigFile(char *nodePath, int bufLen, char* key);
+    int tryGetDevicenodeName(char* nodePath, int bufLen, char* key);
     int tryBestToCleanSerialIO(int fd);
     int sendCMDandCheckRecvMsg(int fd, char *cmd, checkStageLTE key, int retryCnt, int RDndelay);
     int parseATcmdACKbyLineOrSpecialCmd(dialingInfo_t &info, char *buf, int len, checkStageLTE e);
@@ -74,7 +76,6 @@ protected:
     int fd;
     char nodePath[BOXV3_NODEPATH_LENGTH];
     QMutex mutexDial;
-    QTimer monitorTimer;
     QMutex mutexInfo;
     dialingInfo_t dialingInfo_tmp;
     dialingInfo_t dialingInfo;

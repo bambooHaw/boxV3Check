@@ -10,6 +10,9 @@
 #define BOXV3CHECKAPP_VERSION "V0.9.3"
 
 #define BOXV3_NODEPATH_LTE   "/dev/huawei_lte"
+#define BOXV3_SYS_USB_DEVICES "/sys/bus/usb/devices"
+#define BOXV3_4G_USB_BUS    "3-1"
+#define HUAWEI_LTE_TTYPORT_INFO "Modem"
 #define BOXV3_NODEPATH_LENGTH   128
 #define BOXV3_BAUDRATE_UART 115200
 #define BOXV3_ERRMSGBUF_LEN 1024
@@ -55,16 +58,6 @@
             strcpy(gData.errInfo.errMsgBuf, NULL==notifyMsg?"\n":notifyMsg);\
         }\
     }while(0)
-
-#define DEBUG_PRINTF(fmt, args...) printf("---debug---%s(line:%d)"fmt"\n", __func__, __LINE__, ##args)
-
-#define ERR_PRINTF(fmt, args...) do{ \
-    bzero(&gData.errInfo, sizeof(errInfo_t));\
-    gData.errInfo.filep = (char*)__FILE__;\
-    gData.errInfo.funcp = (char*)__func__;\
-    gData.errInfo.line = __LINE__;\
-    printf("_Error_: %s(line:%d)"fmt"\n", __func__, __LINE__, ##args);\
-}while(0)
 
 typedef struct _errInfo{
     char* filep;
@@ -218,6 +211,17 @@ extern "C"{
 extern globalData_t gData;
 extern void emergency_sighandler(int signum);
 extern void __attribute__((constructor)) initializer_before_main(void);
+
+#define DEBUG_PRINTF(fmt, args...) printf("---debug---%s(line:%d)"fmt"\n", __func__, __LINE__, ##args)
+
+#define ERR_PRINTF(fmt, args...) do{ \
+    bzero(&gData.errInfo, sizeof(errInfo_t));\
+    gData.errInfo.filep = (char*)__FILE__;\
+    gData.errInfo.funcp = (char*)__func__;\
+    gData.errInfo.line = __LINE__;\
+    printf("_Error_: %s(line:%d)"fmt"\n", __func__, __LINE__, ##args);\
+}while(0)
+
 #ifdef __cplusplus
 }
 #endif
