@@ -8,7 +8,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     QObject::connect(&timerWatchDog, &QTimer::timeout, this, &MainWindow::slotWatchDogHandler, Qt::QueuedConnection);
-    timerWatchDog.start(1000);
+    QTimer::singleShot(0, &timerWatchDog, SLOT(start()));
+    timerWatchDog.setInterval(1000);
+
     ui->lineEdit_version->setText(QString((char*)BOXV3CHECKAPP_VERSION));
     slotDisplayInit(false);
 }
