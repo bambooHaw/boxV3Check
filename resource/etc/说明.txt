@@ -1,3 +1,0 @@
-1. 添加fstab_tmp_parts中的内容到/etc/fstab文件中
-
-2. 添加inittab_tmp_parts中的内容到/etc/inittab文件中
