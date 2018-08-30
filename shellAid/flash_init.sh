@@ -3,6 +3,7 @@
 #All copyright reserved, but will obey GPL V2.0
 #V1.0 2018.07.02 	#by Hensen |  first write
 #V2.0 2018.07.31	#by Hensen |  involved in syslogd management
+#V2.1 2018.08.30 #by Henry | modify for flash_init without mtd subsystem
 
 #func:
 # 该脚本在boxV3CheckApp进行烧录检测的起始阶段会被调用，以完成盒子3上spi-flash的格式化操作
@@ -28,6 +29,13 @@ blockSize=0x40000
 partSize=0x200000
 partitionInfo="NorFlash-p"
 timesCntFlashcp=3
+
+#0. check whether it's there for /proc/mtd
+output=$(ls /proc | grep "mtd")
+if [ ! -n "${output}" ]; then
+	exit 6
+fi
+
 
 #1. operate all flash node 
 flashPartsNum=$(cat /proc/mtd | grep ${partitionInfo} |cut -d ":" -f0 | awk '{print NR}' | tail -1)
