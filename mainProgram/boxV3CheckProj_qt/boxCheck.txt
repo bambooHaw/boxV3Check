@@ -1,0 +1,747 @@
+commit 4482cdceb1f9d6fcc3e1552e5eb407c25fbc8ab5
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Jul 4 18:13:56 2018 +0800
+
+    V2.9.5.1
+    1) finished quit after all check flags are ok
+    2) finished mtd-flash init
+    3) finished remove /dev/mmcblk0p1/9/10 mkfs code from the proj
+    
+    4) need test again
+    	modified:   boxv3.cpp
+    	modified:   main.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadkeydetection.cpp
+    	modified:   threadlogrecorder.cpp
+
+commit 2168a0812ddcd14687cdd14602afcf1bca377a1b
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Jul 4 10:30:09 2018 +0800
+
+     2.9.5
+    1) finished kill another boxV3CheckApp
+    
+    modified:   main.cpp
+
+commit bd531717bd2254b697aa4f329628e037f4f8671f
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue Jul 3 16:50:41 2018 +0800
+
+    V2.9.4
+    1) finished mtd-flash check
+    2) finished killAllOtherapp
+    3) unfinished mtd-flash init
+    	modified:   boxv3.h
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	modified:   threadagingmonitor.cpp
+    	modified:   threadgeneralexamination.cpp
+
+commit 0fdba425acfa78db2b02c4de5bf9fddbdc562298
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Jun 27 15:28:25 2018 +0800
+
+    V2.9.2
+    1) finished general check led indicate!
+    	modified:   threadled.cpp
+    	modified:   threadtcpserver.cpp
+
+commit ffc68906b15eac57afeb0a5ddf5c8dc4a6c5f876
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Jun 27 10:57:01 2018 +0800
+
+    V2.9.2
+    1) finished agingCheck led display:
+    	a. LED all shine indicate it's NOTCHECK
+    	B. LED shine one by one indicate it's ONCHECK
+    	C. LED ALL light indicate it's agingCheck time is over 48 hours
+    	d. all off indicate something is wrong
+    
+    2) finished off visible the checkout groupbox
+    
+    	modified:   mainwindow.cpp
+    	modified:   mainwindow.ui
+    	modified:   threadagingmonitor.cpp
+    	modified:   threadled.cpp
+    	modified:   threadlogrecorder.cpp
+
+commit 4124678ad58217e66a6cbb7c4cb866abfe19f219
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue Jun 26 18:21:38 2018 +0800
+
+    v2.9.1
+    1) agingCheck Font set as 20
+    2) led display for agingCheck, it could work, but not yet finished all
+    	modified:   threadagingmonitor.cpp
+    	modified:   threadled.cpp
+
+commit 64b58aa262032516d67f63c8004529e094c6c611
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue Jun 26 18:10:11 2018 +0800
+
+    V2.9
+    1) agingCheck led display
+    	modified:   mainwindow.cpp
+    	modified:   threadagingmonitor.cpp
+
+commit cecacc89457cfd84d7a8ca52e08b3c61382bbdaa
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu Jun 7 19:35:32 2018 +0800
+
+    V2.8
+    1) finished keypressed light display button
+    2) finished tcp 0 0x0 0x04 new command
+    3) finished new agingCheckApp
+    	modified:   boxV3CheckApp.pro.user
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadlogrecorder.cpp
+    	modified:   threadtcpserver.cpp
+    	modified:   threadudpbroadcast.cpp
+
+commit 10c662b3ba04a1f98967ff95950f58db00d3b439
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu Jun 7 13:12:58 2018 +0800
+
+    V2.7
+    1) add aging net check
+    2) led indicate net checkout
+    	modified:   main.cpp
+    	modified:   threadagingmonitor.cpp
+    	modified:   threadled.cpp
+
+commit 5ce748f6605d67cf1790996cc74afddec33dbece
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Jun 6 17:02:48 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadagingmonitor.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadlogrecorder.cpp
+    	modified:   threadudpbroadcast.cpp
+
+commit cc14321a13f957a010f75078ad3362d6704ad74a
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue Jun 5 17:19:09 2018 +0800
+
+    v2.3
+    1) update time zone problem
+    2) update stm8 problem
+    3) update udp problem
+    	new file:   boxv3.cpp
+    	modified:   mainwindow.cpp
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadkeydetection.cpp
+    	new file:   threadudpbroadcast.cpp
+
+commit f0bc9b10e947b242718b0b0bd3cf115374bfa40e
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 29 18:39:41 2018 +0800
+
+    1) debug a stm8 fuse flash filename error
+    2) debug wifi check time delay
+    3) debug 4g check time delay
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadkeydetection.cpp
+    	modified:   threadlogrecorder.cpp
+
+commit f8a9f18545a4a1be31b841fd666503abc2930db9
+Author: Hensen <xiansheng929@163.com>
+Date:   Mon May 28 16:23:39 2018 +0800
+
+    1) finished mfAndLot id bug
+    2) finished wirenet test time bug
+    
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadgeneralexamination.cpp
+
+commit 6edc055cb6767a768c2c881b4fcbff457f5ea81f
+Author: Hensen <xiansheng929@163.com>
+Date:   Sat May 26 20:01:55 2018 +0800
+
+    1) finished all v1.0
+    2) bug:
+    	2.1) log name
+    	2.2) at88sc driver -> open once by one at one time
+    	2.3) language
+
+commit d119badaa3272145d059ad333bca2ab606c132ba
+Author: Hensen <xiansheng929@163.com>
+Date:   Sat May 26 16:14:51 2018 +0800
+
+    1) done debug at88sc rdwr
+
+commit 315c4a7855364d26ef1b41f75fe87085f9b1f59d
+Author: Hensen <xiansheng929@163.com>
+Date:   Sat May 26 15:33:59 2018 +0800
+
+    1) basically finished production check, all check done, udp/tcp also work well
+    2) bug:
+    	at88sc open lock -> none, not save
+    	log language
+    3) undone aging check
+    4) undone aged check
+    	modified:   mainwindow.cpp
+    	modified:   threadgeneralexamination.cpp
+
+commit d40c4b4dd8bd4392b8c5cc4da4c314199db7f819
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 25 21:35:35 2018 +0800
+
+    1) finished all
+    2) bug: net
+    3) at88sc104 bug
+    
+    	modified:   threadgeneralexamination.cpp
+
+commit 14bc3850ca7afb79e75d7d87526ac3d7e6661bcb
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 25 18:17:35 2018 +0800
+
+    1) finished the whole framework
+    2) but wifi and display has some bug
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadgeneralexamination.cpp
+
+commit 9fa5a224e95b1797b3085119664decfaf2e887d4
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 24 21:56:37 2018 +0800
+
+    1) unfinished log recorder, almost finished it
+    	modified:   threadlogrecorder.cpp
+
+commit 4ef40acd20bea691ad7780f8d718d6af1963ead1
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 24 19:29:08 2018 +0800
+
+    1) unfinish 4g wifi test check use sh script
+
+commit 8f86ef7836ab306bd21acf6ee9ea7893fdc7a119
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 23 08:32:55 2018 +0800
+
+    1) finished debug run time for all thread
+    2) finished led display
+    3) finished log index
+    11)bug log system and display system not normal
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadkeydetection.cpp
+    	modified:   threadled.cpp
+    	modified:   threadlogrecorder.cpp
+
+commit 91b74503358706fe2b4de1e88effece19a3dbf16
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 18 18:31:46 2018 +0800
+
+    0) boxV3CheckApp v1.0
+    1) finished all
+    2) add display aging checkout
+    3) add led display
+    4) change dir for firmware
+    	modified:   main.cpp
+    	modified:   threadgeneralexamination.cpp
+
+commit 9a9db0339c8228dc0086df45132e2368be628125
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 18 11:21:00 2018 +0800
+
+    1) finished led display
+    	modified:   threadkeydetection.cpp
+    	modified:   threadled.cpp
+
+commit 940cad3846561d9fd446452b176e05f719821407
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 17 18:22:20 2018 +0800
+
+    	modified:   main.cpp
+    	modified:   threadgeneralexamination.cpp
+    	new file:   threadled.cpp
+    	modified:   threadtcpserver.cpp
+
+commit 4273f1be950dfb173427d05576b34c2a582f46eb
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 17 16:35:15 2018 +0800
+
+    1) general completion, finished basically
+    2) generate json checkout file at /usr/boxv3/qt/checkout/ dir
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	modified:   objectat88sc104c.cpp
+    	modified:   objectuart.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadkeydetection.cpp
+
+commit baf16dcdf1e4480c2bf8fa353fad8258141c4e0d
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 17 09:27:10 2018 +0800
+
+    1) finished stm8 version check, but not done the option for flash burnning stm8
+    2) fixed the blocked bug of app communicate with stm8
+    	modified:   boxV3CheckApp.pro.user
+    	modified:   objectuart.cpp
+
+commit 3645081e26db157216d01573759cd17b9a85c01d
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 16 19:37:51 2018 +0800
+
+    1) finished merged, need to test for tcp and udp
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadkeydetection.cpp
+    	modified:   threadtcpserver.cpp
+
+commit 2028b31c95f044aa6265f52c703798183eebd49e
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 15 20:06:31 2018 +0800
+
+    boxv3CheckApp v0.0.1
+    1) finished base log and check
+    	modified:   mainwindow.cpp
+    	modified:   threadkeydetection.cpp
+
+commit 9be31f9eb97aaa5fcc042f8db1ecbe3e5ec2c36f
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 15 18:15:34 2018 +0800
+
+    1) finished disply the log method, but not finished all
+    	modified:   mainwindow.cpp
+    	modified:   threadkeydetection.cpp
+
+commit 5dc7ae370d3f797163def8a5a555ed82c8e51233
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 15 14:56:36 2018 +0800
+
+    1) all merge has done! but there are a lot of bugs :(
+
+commit de6182196cf47036d46e0ecae95f2704b3c7bd14
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 15 11:33:57 2018 +0800
+
+    1) finished barCodeGun/key/log/window thread update
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	modified:   threadkeydetection.cpp
+    	modified:   threadlogrecorder.cpp
+
+commit eccd6d86d33f23422eccbea548f7226eefbe5cc4
+Author: Hensen <xiansheng929@163.com>
+Date:   Mon May 14 18:10:37 2018 +0800
+
+    	1) finished bar thread
+    	2) finished key thread
+    	3) finished log thread
+    	4) finished window thread
+    	for new viso design
+    
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	modified:   threadbarcodegun.cpp
+    	modified:   threadkeydetection.cpp
+    	modified:   threadlogrecorder.cpp
+
+commit c4caa1d9767f23f5fca916e394451e5594eaac37
+Author: Hensen <xiansheng929@163.com>
+Date:   Mon May 14 13:55:59 2018 +0800
+
+    	1) finished aging uptime recorder
+    	modified:   threadagingmonitor.cpp
+
+commit 02034e61c882f8c532c6c8a93a8340433ae63f62
+Author: Hensen <xiansheng929@163.com>
+Date:   Sun May 13 19:44:55 2018 +0800
+
+    	1) finieshed cut uptime's time
+    	2) create uptime recorder tmp log file
+    	3) get max uptime, but not write it to the logfile
+    
+    	modified:   threadagingmonitor.cpp
+
+commit 82c9ac78f786885e9ac12d682893089729864c40
+Author: Hensen <xiansheng929@163.com>
+Date:   Sun May 13 17:19:39 2018 +0800
+
+    	1) finished creating logname by time
+    	2) finished closing udp when tcp connection occured
+    	3) finished create agingLicense file when tcp upload logfile
+    	4) finished show notes when step1: production finished
+    	modified:   main.cpp
+    	modified:   mainwindow.ui
+    	modified:   threadgeneralexamination.cpp
+    	modified:   threadlogrecorder.cpp
+    	modified:   threadtcpserver.cpp
+
+commit 10052b8b32e7709770eafc980b41278c10295356
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 10 18:33:05 2018 +0800
+
+    	v3.3.9
+    	new file:   threadagingmonitor.cpp
+    	modified:   threadbarcodegun.cpp
+    1)	newly add aging detection thread
+    2)  debug key pressed when illegal character serial Num get.
+
+commit 56c55b4b3e25a7c3b56e94b269187771ec085593
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 10 16:30:06 2018 +0800
+
+    	modified:   threadgeneralexamination.cpp
+    	debug exec when have a BadCode.
+
+commit 6ae3d4a8ed505b7bbb8d2ccb6848da6e1ae50480
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 9 17:39:57 2018 +0800
+
+    	1) v3.3.7
+    	2) debug:
+    		wifi(ip) display in Chinese
+    		Chinese display format
+    	modified:   objectuart.cpp
+    	modified:   threadgeneralexamination.cpp
+
+commit f7e9c5f9cb6a586f6815bab08a6e748f4f0530fe
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 9 16:12:51 2018 +0800
+
+     finished net wan check
+
+commit 2ba66051fd642918f6c026424b59e8a92db629c9
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 9 16:05:38 2018 +0800
+
+    	1) v3.3.6, debug net check display
+    	modified:   threadgeneralexamination.cpp
+
+commit b3c1ab2d037238a4464515ab491ea206f0000de6
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 9 13:57:05 2018 +0800
+
+    	0) v3.3.5 , main debug at88sc104 check
+    	modified:   objectat88sc104c.cpp
+
+commit 1c34c9b10e81f32428fed87de3f034ef7b50011f
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 9 13:42:28 2018 +0800
+
+    	modified:   objectat88sc104c.h
+    	0) v3.3.4
+    	1) debug at88sc104 passwd check
+    	2) undebug wan&lan net check take a long time bug
+
+commit c508698bae65a7ef48eeefe3e574e98f872d789f
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 8 18:01:52 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	modified:   threadgeneralexamination.cpp
+    	a tmp git
+
+commit f474d12dbcadbdab0b9707b72e5a1c8caad260b0
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 8 15:36:50 2018 +0800
+
+    	modified:   threadbarcodegun.cpp
+    	modified:   threadgeneralexamination.cpp
+    	dealed with the bug that msg messed when key pressed many times
+
+commit 267401742cde0432ac9857ccdae055ef2cd1188f
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 8 14:57:13 2018 +0800
+
+    	modified:   objecttcpdumpkiller.cpp
+    	modified:   threadgeneralexamination.cpp
+    	deal with the bug that key was pressed but no check occured
+
+commit 16e590e54c23f481216c2fe2390d638bbdd21836
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue May 8 10:55:23 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	finished chinese tips, not the log file language.
+
+commit a7072f0350a92d19a48a7ae6c4a3c240d5b1580b
+Author: Hensen <xiansheng929@163.com>
+Date:   Mon May 7 20:57:30 2018 +0800
+
+    	deleted:    loading.gif
+    	modified:   mainwindow.cpp
+    	modified:   threadgeneralexamination.cpp
+    	1)	finished 4g check;
+    	2)	finished ui update immediately
+
+commit 84e9e3eeb58e225bd1528cb88181b2a0e20326e8
+Author: Hensen <xiansheng929@163.com>
+Date:   Mon May 7 13:19:14 2018 +0800
+
+    	modified:   main.cpp
+    	modified:   mainwindow.cpp
+    	add support chinese font for wenquanyi
+
+commit 0927a60991155d9bc03d0e224f374311abb98c92
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 4 18:08:07 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	modified:   threadgeneralexamination.cpp
+    	1) add new icon for start
+    	2) debug wifi has been shut down after net&Lan check, so that udp can't communicate with server
+
+commit da90567a1a07299678dadd3d26eb15fb7ad45a58
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 4 15:48:10 2018 +0800
+
+    	modified:   threadgeneralexamination.cpp
+    	debug udp start mess bug
+
+commit 1b4e7b30d9d0c3f68e98a48ee450ea2002b1ed8c
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 4 15:06:45 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	modified:   mainwindow.ui
+     1)	debug udp connect, just communicate with one server
+     2) updage the light icon
+
+commit 6de78416825180bd59a56b4d2846aa777aba20ea
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri May 4 11:08:52 2018 +0800
+
+    	modified:   main.cpp
+    	modified:   objectuart.cpp
+    	modified:   threadlogrecorder.cpp
+    1) 	finished specified logFile;
+    2)	buf: stm8 version detection.
+
+commit 27225c582f81ce20c066c850361a7b2cb7bf7d58
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 3 22:12:30 2018 +0800
+
+    	modified:   main.cpp
+    	modified:   mainwindow.ui
+    	finished show time and cpuTemp
+
+commit c277f7500ac92d74d8282529ad28f414c7075ba4
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 3 21:33:00 2018 +0800
+
+    	modified:   threadlogrecorder.cpp
+    	modified:   threadtcpserver.cpp
+    
+    	finished log dynamic create, but have a bug: filename is wrong.
+
+commit 95bd379834c210d3172280d4e12a364e299f99e8
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 3 18:48:48 2018 +0800
+
+    	modified:   threadgeneralexamination.cpp
+    	finished all green and red display
+
+commit ea51f842571a45a739a35f083e636259cd541d62
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 3 17:59:22 2018 +0800
+
+    	modified:   threadgeneralexamination.cpp
+    	finished net argument and it's display
+
+commit 8a0fc7604e421f907c2863139ee2968ae9f4f5ed
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 3 13:54:11 2018 +0800
+
+    	tmp file
+    	just finished the merge
+
+commit ecfaa8fc307127d6121c903f98ab2c6b39922a78
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 3 11:27:15 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	finished to pressed key
+    	unfinish at judge the checkout
+
+commit 230169728f0c7d87ff0ff8f6f804c13e3dc19263
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu May 3 10:28:14 2018 +0800
+
+    	modified:   mainwindow.ui
+    	a little adjust, tmp git
+
+commit b5888daebc2a8dcfe7f17598068174e4896ccd96
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 2 17:50:55 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	modified:   threadgeneralexamination.cpp
+    	finished all lights
+    	but have bugs:
+    	1) lights display wrong uart232/lanport/wanport
+    	2) exec sequence not in normal
+
+commit 073728a4451e91e9707ddd037bbe63adf4f50767
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 2 16:04:27 2018 +0800
+
+    	modified:   threadgeneralexamination.cpp
+    	finished all Lan port check in new request
+
+commit 55fb78a75f3f348c82343b91a9ba6439d92fa275
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed May 2 14:35:25 2018 +0800
+
+    	modified:   mainwindow.ui
+    	modified:   threadgeneralexamination.cpp
+    	add some lights indication
+
+commit 943882162a2ef226922e28b2a3213c830141db98
+Author: Hensen <xiansheng929@163.com>
+Date:   Sat Apr 28 17:16:04 2018 +0800
+
+    	modified:   threadgeneralexamination.cpp
+    	finished 4g.
+    	unfinished wan and lan
+
+commit 7c9aafbff33e0cb60bda8fa3f452fe59ae39337e
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri Apr 27 20:14:39 2018 +0800
+
+    	modified:   mainwindow.cpp
+    	finished add red/green lights display
+
+commit c328d9f7d8b8cbf71af5f5a3d8faa0dfc54bb218
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri Apr 27 19:37:08 2018 +0800
+
+    	modified:   mainwindow.ui
+    	finished modified ui
+
+commit 881fc8cdc02deec63435c2b21ac341b176ccae4e
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri Apr 27 17:38:31 2018 +0800
+
+    	deleted:    dialog.cpp
+    	renamed:    ztboxtest.ui -> mainwindow.ui
+    	new file:   mainwindowhasudp.cpp
+    	modified:   objectat88sc104c.cpp
+    	modified:   threadgeneralexamination.cpp
+    	deleted:    ztboxtest.cpp
+    	finished at88sc104a p2pid set/read
+    	finished udp/tcp connection with pc
+
+commit 0ac13301621c7abf3ec65dc80a67bb2081b6e293
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu Apr 26 17:41:07 2018 +0800
+
+    	modified:   threadgeneralexamination.cpp
+    	finished spi-lora spi-flash stm8 check
+    	unfinish stm8-net check
+
+commit 1a4342c337a1142aed399295821153874544c205
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu Apr 26 11:51:37 2018 +0800
+
+    	modified:   objectat88sc104c.h
+    	modified:   threadgeneralexamination.cpp
+
+commit c3e087f080fdfbc7e0f7801b27490b38df648e37
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu Apr 26 11:25:42 2018 +0800
+
+    	modified:   objectuart.cpp
+    	finished uart232 self check, and this log recorder.
+
+commit 8bb1b530ff387a95a190fe49d2f6e83a1a185ed7
+Author: Hensen <xiansheng929@163.com>
+Date:   Thu Apr 26 10:32:40 2018 +0800
+
+    	new file:   threadgeneralexamination.cpp
+    	finished log thread bug. Change pointer argument to QByteArray argument.
+
+commit dd19619e37b513af04de8719e462016645b4041d
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Apr 25 15:43:30 2018 +0800
+
+    	modified:   threadbarcodegun.cpp
+
+commit 2c12088687b6da1a7d55fbf9c8e49336a174b6b4
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Apr 25 11:33:31 2018 +0800
+
+    	modified:   main.cpp
+    	modified:   objectuart.cpp
+    	renamed:    barcodegunthread.cpp -> threadbarcodegun.cpp
+    	modified:   threadkeydetection.cpp
+    	new file:   threadlogrecorder.cpp
+    	renamed:    tcpserverthread.cpp -> threadtcpserver.cpp
+    	modified:   ztboxtest.cpp
+    
+    	finished serialNum blend with keyPressed
+    	finished recorder a sysLog
+    	finished recorder scanedBarCode file, last line barCode file is available
+
+commit c666bdc6cb39a95db255b8d04a4f88e66d52b46d
+Author: Hensen <xiansheng929@163.com>
+Date:   Sun Apr 22 15:36:13 2018 +0800
+
+    	new file:   threadkeydetection.cpp
+    	finished BOX v3 sw3 key detection.
+    	finished THE KEY VHDL
+
+commit 76b5acd2271e47637d6e5b7c745286ee347711ac
+Author: Hensen <xiansheng929@163.com>
+Date:   Fri Apr 20 17:36:04 2018 +0800
+
+    	new file:   barcodegunthread.cpp
+    	new file:   objecttcpdumpkiller.cpp
+    	new file:   objectuart.cpp
+    	finished BarCodeGun scan
+    	finished it's getting data to a file
+    	finished it's displaying on the ui with a QMessageBox::information
+
+commit cffd87281d94f7709d04c0804fc4b268403e3e5b
+Author: Hensen <xiansheng929@163.com>
+Date:   Wed Apr 18 18:17:23 2018 +0800
+
+    	modified:   objectat88sc104c.cpp
+    	modified:   tcpserverthread.cpp
+    	finished tcp all tras, contain of upload log file
+    	solved tcpMsg struct Byte Alignment problem(log file do not use a unsigned long variable to store the log dataLen,
+    			because the char and short need to Alignment, and there will be present more 3 bytes data which you don't want)
+
+commit feda43015a08390871f5bad6910f667323c29cf9
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue Apr 17 18:53:15 2018 +0800
+
+    	modified:   tcpserverthread.cpp
+    	finished FedBck tcp heartBeats
+    	finished tcp set mac from tcp client;
+
+commit d2bc15e3887736afb85dcac1042eda7d0ca00c60
+Author: Hensen <xiansheng929@163.com>
+Date:   Tue Apr 17 11:52:07 2018 +0800
+
+    	modified:   tcpserverthread.cpp
+    	tcp server parse data from client success, but those codes couldn't send msg to client
+
+commit 29e712e59d044702a063ea159c84d684f7be86cf
+Author: Hensen <xiansheng929@163.com>
+Date:   Mon Apr 16 19:49:34 2018 +0800
+
+    	new file:   tcpserverthread.cpp
+    	with a bug, not sure about tcp packet's ui16Length and dataLen relationship,
+    	but tcp can't get msg from client, udp work well
+
+commit 4f7ed790545906eab3d78b235e82731f50624487
+Author: Hensen <xiansheng929@163.com>
+Date:   Mon Apr 16 15:05:57 2018 +0800
+
+     Initial commit
+     Modified from zttest v1.0
+     1. display wifi mac and ip: success
+     2. udp broadcast: success

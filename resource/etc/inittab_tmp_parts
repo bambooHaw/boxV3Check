@@ -1,0 +1,14 @@
+
+# Log recording and rotating mission
+null::sysinit:/bin/touch /var/log/messages
+null::respawn:/sbin/klogd -n
+null::respawn:/sbin/syslogd -n -b 4 -s 800
+
+# Flash monitoring mission or something else needs timing which use cron service
+null::sysinit:/bin/mkdir -p /var/spool/cron
+null::sysinit:/usr/bin/crontab /etc/cron.crontab
+null::respawn:/usr/sbin/crond -f
+
+# Stuff to do before rebooting
+null::shutdown:/usr/bin/killall klogd
+null::shutdown:/usr/bin/killall syslogd
