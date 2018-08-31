@@ -779,6 +779,7 @@ void objectUart::slotLanPortCtrlAndCheck()
     slotGetStm8CmdBuf(buf, &bufLen, 1, 1, 7, 1, &data);
     uartCommunicateWithStm8(buf, bufLen);
 
+    system("echo PL9 1 1 1 1 1 > /debugfs/sunxi_pinctrl/sunxi_pin_configure");
     system("brctl delif br0 wlan0");
     system("ifconfig br0 down");
     system("brctl delbr br0");

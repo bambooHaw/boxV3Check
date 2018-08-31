@@ -76,15 +76,16 @@ else
 		output=$(mkfs.jffs2  -s ${pageSize} -e ${blockSize} -p ${partSize} -d ./${tmpString} -o  jffs2.img)
 		output=$(sync)
 		output=$(rm -rf ${tmpString})
-		echo "prepare env for flash init"
+		echo "prepare env&dir for flash init"
 		output=$(killall -9 syslogd)
 		output=$(umount ${blockNode})
 		echo "erase all ${cdevNode}..."
-		output=$(flash_eraseall ${cdevNode})
+		output=$(flash_erase ${cdevNode} 0 0)
 		echo "done!"
 		output=$(sync)
 		echo "make jffs2 img for ${cdevNode}..."
 		output=$(flashcp jffs2.img ${cdevNode})
+		output=$(sleep 1)
 		echo "done!"
 		output=$(sync)
 		output=$(rm jffs2.img)
@@ -97,11 +98,13 @@ else
 		output=$(mkdir -p ${mountPath})
 		output=$(sync)
 		output=$(mount -t jffs2 ${blockNode} ${mountPath})
+		output=$(sleep 1)
 		echo "resume the sys services..."
 		tmpString=$(ps ajx | grep syslogd | grep -v grep)
 		if [ ! -n "${tmpString}" ]; then
 			echo "attempt resume syslogd in manual"
-			output=$(syslogd -n -s ${syslogdRotateSize} -b ${syslogdRotateCnt} &)
+			syslogd -n -s ${syslogdRotateSize} -b ${syslogdRotateCnt} &
+			#output=$(syslogd -n -s ${syslogdRotateSize} -b ${syslogdRotateCnt} &)
 		fi
 		#4.1) if the mtdblock* mounted with a jffs2 img
 		tmpString=$(mount | grep ${blockNode} | grep ${mountPath})

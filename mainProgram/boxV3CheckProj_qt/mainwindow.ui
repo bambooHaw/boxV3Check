@@ -30,59 +30,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>37</y>
-       <width>56</width>
-       <height>19</height>
-      </rect>
-     </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_wifi">
-      <item>
-       <widget class="QLabel" name="label_lightpic_wifi">
-        <property name="text">
-         <string>@ </string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="label_light_wifi">
-        <property name="text">
-         <string>wifi</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-    <widget class="QWidget" name="layoutWidget">
-     <property name="geometry">
-      <rect>
-       <x>22</x>
-       <y>62</y>
-       <width>94</width>
-       <height>19</height>
-      </rect>
-     </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_ntp">
-      <item>
-       <widget class="QLabel" name="label_lightpic_ntpClient">
-        <property name="text">
-         <string>@ </string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="label_light_ntpClient">
-        <property name="text">
-         <string>ntpClient</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-    <widget class="QWidget" name="layoutWidget">
-     <property name="geometry">
-      <rect>
-       <x>22</x>
-       <y>87</y>
+       <y>30</y>
        <width>49</width>
        <height>19</height>
       </rect>
@@ -108,7 +56,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>112</y>
+       <y>50</y>
        <width>84</width>
        <height>19</height>
       </rect>
@@ -134,7 +82,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>137</y>
+       <y>70</y>
        <width>85</width>
        <height>19</height>
       </rect>
@@ -160,7 +108,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>162</y>
+       <y>90</y>
        <width>80</width>
        <height>19</height>
       </rect>
@@ -186,7 +134,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>187</y>
+       <y>110</y>
        <width>75</width>
        <height>19</height>
       </rect>
@@ -212,7 +160,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>212</y>
+       <y>130</y>
        <width>65</width>
        <height>19</height>
       </rect>
@@ -238,8 +186,8 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>237</y>
-       <width>48</width>
+       <y>150</y>
+       <width>49</width>
        <height>19</height>
       </rect>
      </property>
@@ -264,7 +212,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>262</y>
+       <y>170</y>
        <width>63</width>
        <height>19</height>
       </rect>
@@ -290,7 +238,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>287</y>
+       <y>190</y>
        <width>63</width>
        <height>19</height>
       </rect>
@@ -316,7 +264,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>312</y>
+       <y>210</y>
        <width>63</width>
        <height>19</height>
       </rect>
@@ -342,7 +290,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>337</y>
+       <y>230</y>
        <width>63</width>
        <height>19</height>
       </rect>
@@ -368,7 +316,7 @@
      <property name="geometry">
       <rect>
        <x>22</x>
-       <y>362</y>
+       <y>250</y>
        <width>69</width>
        <height>19</height>
       </rect>
@@ -390,11 +338,63 @@
       </item>
      </layout>
     </widget>
+    <widget class="QWidget" name="layoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>22</x>
+       <y>270</y>
+       <width>56</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_wifi">
+      <item>
+       <widget class="QLabel" name="label_lightpic_wifi">
+        <property name="text">
+         <string>@ </string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_light_wifi">
+        <property name="text">
+         <string>wifi</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="layoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>22</x>
+       <y>290</y>
+       <width>91</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_ntp">
+      <item>
+       <widget class="QLabel" name="label_lightpic_ntpClient">
+        <property name="text">
+         <string>@ </string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_light_ntpClient">
+        <property name="text">
+         <string>ntpdate </string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
     <widget class="QLabel" name="label_lightpic_agingResult">
      <property name="geometry">
       <rect>
        <x>23</x>
-       <y>390</y>
+       <y>310</y>
        <width>18</width>
        <height>17</height>
       </rect>
@@ -407,7 +407,7 @@
      <property name="geometry">
       <rect>
        <x>50</x>
-       <y>390</y>
+       <y>310</y>
        <width>131</width>
        <height>17</height>
       </rect>
@@ -459,75 +459,6 @@ p, li { white-space: pre-wrap; }
     <property name="text">
      <string>@ whole</string>
     </property>
-   </widget>
-   <widget class="QWidget" name="layoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>51</x>
-      <y>571</y>
-      <width>291</width>
-      <height>86</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
-       <item>
-        <widget class="QLabel" name="label_ipWifi">
-         <property name="text">
-          <string>Wifi( ip ):</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="labelSysTime">
-         <property name="text">
-          <string>系统时间：</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="labelCpuTemp">
-         <property name="text">
-          <string>cpu温度：</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_3">
-       <item>
-        <widget class="QLineEdit" name="lineEdit_ipWifi">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QDateTimeEdit" name="dateTimeEditSys"/>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QLabel" name="label_bar_cpuTemp">
-           <property name="text">
-            <string>tempBar</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_celsius">
-           <property name="text">
-            <string>Celsius</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-      </layout>
-     </item>
-    </layout>
    </widget>
    <widget class="QLabel" name="label_checkStatus">
     <property name="geometry">
@@ -593,6 +524,100 @@ p, li { white-space: pre-wrap; }
       </widget>
      </item>
     </layout>
+   </widget>
+   <widget class="QGroupBox" name="groupBox">
+    <property name="geometry">
+     <rect>
+      <x>50</x>
+      <y>570</y>
+      <width>311</width>
+      <height>141</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>系统提示:</string>
+    </property>
+    <widget class="QWidget" name="layoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>30</y>
+       <width>290</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_3">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_ipWifi">
+        <property name="text">
+         <string>Wifi( ip ):</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="lineEdit_ipWifi">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="layoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>60</y>
+       <width>271</width>
+       <height>28</height>
+      </rect>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelSysTime">
+        <property name="text">
+         <string>系统时间：</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QDateTimeEdit" name="dateTimeEditSys"/>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="layoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>90</y>
+       <width>291</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelCpuTemp">
+        <property name="text">
+         <string>cpu温度：</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLabel" name="label_bar_cpuTemp">
+        <property name="text">
+         <string>tempBar</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QLabel" name="label_celsius">
+        <property name="text">
+         <string>Celsius</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">

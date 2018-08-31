@@ -31,7 +31,7 @@ extern void testPreparation(void);
 
 #define BOXV3_SOFTWARE_FILEPATH "/run/sysversion"
 #define BOXV3_SOFTWARE_VERSION "BoxV3-Linux3.4.39"
-#define BOXV3CHECKAPP_VERSION "V3.1.1"
+#define BOXV3CHECKAPP_VERSION "V3.1.2"
 
 //bargun tmp file
 #define BOX_V3_BAR_CODE_TMP_FILE    "/run/boxv3/barCodeGun/signalCode.txt"
@@ -76,6 +76,7 @@ extern void testPreparation(void);
 
 #define LINUX_NODE_PROC_MTD "/proc/mtd"
 #define BOXV3_MTD_FLASH_PART1_NAME "NorFlash-p0 system"
+#define BOXV3_MTD_FLASH_PART1_NAME1 "W25Q32(Nor)-P0 system"
 
 
 //picture path

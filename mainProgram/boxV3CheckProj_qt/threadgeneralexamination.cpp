@@ -819,8 +819,7 @@ char threadGeneralExamination::slotCheckNtpAndSysDate()
         system("killall -9 ntpd");
         system("killall -9 ntpdate");
         //NTP 服务器, 最常见、熟知的就是 www.pool.ntp.org/zone/cn，国内地址为：cn.pool.ntp.org
-        system("ntpdate -d cn.pool.ntp.org >> /tmp/ntpCheckTmp.txt &");
-        sleep(15);
+        system("ntpdate -d cn.pool.ntp.org >> /tmp/ntpCheckTmp.txt ");
 
         QFile file("/tmp/ntpCheckTmp.txt");
         if(!file.open(QIODevice::ReadOnly|QIODevice::Text))
@@ -834,13 +833,16 @@ char threadGeneralExamination::slotCheckNtpAndSysDate()
             QString txt = io.readAll();
             file.close();
 
-            if(txt.contains("adjust time"))
+            if(txt.contains("adjust time") || txt.contains("synchronization"))
             {
                 ret = WELLCHECK;
                 break;
-            }else
+            }else if(txt.contains("Can't find"))
             {
                 ret = FAILEDEVENT2;
+            }else
+            {
+                ret = FAILEDEVENT3;
                 continue;
             }
         }
@@ -997,7 +999,7 @@ char threadGeneralExamination::slotCheckSpi0Flashby_mtd()
         QString txt = io.readAll();
         file.close();
 
-        if(txt.contains(BOXV3_MTD_FLASH_PART1_NAME))
+        if(txt.contains(BOXV3_MTD_FLASH_PART1_NAME) || txt.contains(BOXV3_MTD_FLASH_PART1_NAME1))
         {
             system("mount | grep '/mnt/mtdblock' > tmp_flash_test.txt");
             QFile tmp_file("tmp_flash_test.txt");
@@ -1007,7 +1009,7 @@ char threadGeneralExamination::slotCheckSpi0Flashby_mtd()
             }else
             {
                 QTextStream tmp_io(&tmp_file);
-                QString tmp_txt = tmp_io.readAll();
+                QString tmp_txt = tmp_io.readAll(); 
                 tmp_file.close();
 
                 if(tmp_txt.contains("/mnt/mtdblock"))
@@ -1492,8 +1494,9 @@ void threadGeneralExamination::run()
         //clear aging stage's logs
         clearAgingLog();
         //fdisk partition when it's production check stage
-        //fdiskForTheNewBox();
         emit signalRecorder(LOG_NOTICE, "pro1");
+        sleep(1);
+        fdiskForTheNewBox();
         break;
     }
     case SELFCHECK_AGED:

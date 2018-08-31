@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/bin:/usr/sbin
+HOME=/
+* * * * * /bin/bash /root/manage_flash_cap.sh > /opt/private/log/spi-flash.recorder

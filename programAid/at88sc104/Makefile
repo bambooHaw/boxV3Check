@@ -14,4 +14,4 @@ modules:
 	
 clean:
 	$(MAKE) -C $(KERNEL_DIR) M=$(shell pwd) clean 
-	rm -rf *.o a.out optAT88
+	rm -rf *.o a.out optAt88

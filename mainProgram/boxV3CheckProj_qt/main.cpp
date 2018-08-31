@@ -260,11 +260,11 @@ int main(int argc, char *argv[])
     }
     case -ENXIO:
     {
-        emit key.signalRecorder(LOG_CRIT, "", "warning at88 ENXIO");
+        emit key.signalRecorder(LOG_CRIT, "", "Warning: AT88 ENXIO");
     }
     default:
     {
-        emit key.signalRecorder(LOG_CRIT, "", "Success access at88");
+        //emit key.signalRecorder(LOG_CRIT, "", "Access AT88 success!");
         break;
     }
     }

@@ -7,10 +7,8 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     //ui->lineEdit_VersionAndRunCnt->setVisible(false);
     QObject::connect(&aliveTimer, SIGNAL(timeout()), this, SLOT(slotShowAlive()));
-    qDebug() << __func__<<  __LINE__ << endl;
     aliveTimer.setInterval(1000); //1000
     QTimer::singleShot(0, &aliveTimer, SLOT(start()));
-    qDebug() << __func__<<  __LINE__ << endl;
 
     initDisplayScreen();
 
@@ -34,6 +32,8 @@ void MainWindow::initDisplayScreen()
     ft.setPointSize(16);
     ui->label_serialNum->setFont(ft);
 #endif
+    //to make normal img to fit the QImage for Qt
+    //just do it at once
 #if 1
     QImage png;
     //loading
@@ -73,9 +73,7 @@ void MainWindow::initDisplayScreen()
     ui->label_light_keyPressed->show();
 #endif
 
-    //invisible time and wifi window, open them when they're avalable
-    ui->labelSysTime->setVisible(false);
-    ui->dateTimeEditSys->setVisible(false);
+    //invisible wifi window, open them when they're avalable
 
     ui->label_ipWifi->setVisible(false);
     ui->lineEdit_ipWifi->setVisible(false);
@@ -104,7 +102,9 @@ void MainWindow::slotShowWifiIp()
 
 void MainWindow::slotShowAlive()
 {
-    ui->lineEdit_VersionAndRunCnt->setText(QDateTime::currentDateTime().toString("yyyy/MM/dd[HH:mm:ss]"));
+    //ui->lineEdit_VersionAndRunCnt->setText(QDateTime::currentDateTime().toString("yyyy/MM/dd[HH:mm:ss]"));
+    ui->dateTimeEditSys->setDateTime(QDateTime::currentDateTime());
+    ui->dateTimeEditSys->setDisplayFormat("yyyy/MM/dd HH:mm:ss");
 }
 
 void MainWindow::showWifiMac()
@@ -116,16 +116,14 @@ void MainWindow::showWifiMac()
 
 void MainWindow::slotShowSystemDataAndTime()
 {
-    ui->labelSysTime->setVisible(true);
-    ui->dateTimeEditSys->setVisible(true);
     //if(0 != generalThreadStarted)
     {
-        QDateTime dataTime = QDateTime::currentDateTime();
+        //QDateTime dataTime = QDateTime::currentDateTime();
         //dataTime.setTimeZone(QTimeZone);
         //ui->dateTimeEditSys->setDateTime(dataTime.setTimeSpec(Qt::LocalTime););
         //QTimeZone tz = dataTime.timeZone();
-        ui->dateTimeEditSys->setDateTime(dataTime);
-        ui->dateTimeEditSys->setDisplayFormat("yyyy/MM/dd HH:mm:ss");
+        //ui->dateTimeEditSys->setDateTime(dataTime);
+        //ui->dateTimeEditSys->setDisplayFormat("yyyy/MM/dd HH:mm:ss");
     }
 }
 
