@@ -14,7 +14,8 @@ extern QMutex mutexAT88;
 
 extern void prepareNetEnv(void);
 extern void prepareCommunicationEnv(void);
-extern void killallOtherApps(char killWlanFlag);
+extern void killallBrotherApps(char killWlanFlag);
+extern void killallOtherApps(void);
 extern void quit_sighandler(int signum);
 extern void testPreparation(void);
 
@@ -31,7 +32,7 @@ extern void testPreparation(void);
 
 #define BOXV3_SOFTWARE_FILEPATH "/run/sysversion"
 #define BOXV3_SOFTWARE_VERSION "BoxV3-Linux3.4.39"
-#define BOXV3CHECKAPP_VERSION "V3.1.2"
+#define BOXV3CHECKAPP_VERSION "V3.1.2_2"
 
 //bargun tmp file
 #define BOX_V3_BAR_CODE_TMP_FILE    "/run/boxv3/barCodeGun/signalCode.txt"

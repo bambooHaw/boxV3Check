@@ -87,6 +87,7 @@ void threadKeyDetection::slotKeyHasBeenPressed()
         emit signalRecorder(LOG_NOTICE, "warning barCode0");
     }else
     {
+        killallOtherApps();
         currentStatus.pressedCnt++;
     }
 

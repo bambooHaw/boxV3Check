@@ -9,7 +9,7 @@ void emergency_sighandler(int signum)
 }
 
 //constructor func
-void __attribute__((constructor)) initializer_before_main(void){
+void __attribute__((constructor)) initializer_before_main(int argc, char *argv[]){
     //init global Data env
     bzero(&gData, sizeof(globalData_t));
     gData.tryCount = TRY_COUNT_INFINITE_SIGN;

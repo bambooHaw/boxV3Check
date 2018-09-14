@@ -27,17 +27,26 @@ void killallBrotherApps(char killWlanFlag)
     system("killall -9 checkAppFor4G >> /dev/null");
 }
 
-void killallOtherApps(char killWlanFlag)
+void killallOtherApps(void)
 {
-    killallBrotherApps(killWlanFlag);
-    system("killall -9 HWDaemon.out >> /dev/null");
-    system("killall -9 MCU >> /dev/null");
+    system("killall -9 HWDaemon.out");  //process monitor
+    system("killall -9 MCU");           //web communucation
+    system("killall -9 node");          //web setting
+    system("killall -9 demoTunnel");    //p2p management
+    system("killall -9 hostapd");       //wifi ap
+    system("killall -9 udhcpd");        //net brig
+
+    system("killall -9 udhcpc");        //udhcpc for eth0
+    system("killall -9 ntpd");
+    system("killall -9 ping");
+    system("killall -9 tcpdump");
 }
 
 void prepareCommunicationEnv(void)
 {
     prepareNetEnv();
-    killallOtherApps(0);
+    killallBrotherApps(0);
+    killallOtherApps();
     system("ifconfig eth0 down");
     system("ifconfig eth1 down");
     system("ifconfig usb0 down");
@@ -51,7 +60,8 @@ void quit_sighandler(int signum)
     if(SIGINT == signum)
     {
         qDebug("quit by user!");
-        killallOtherApps(1);
+        killallBrotherApps(1);
+        killallOtherApps();
         kill(getpid(), 9);
         //system("exit(0)");
         //system("killall -9 boxV3CheckApp");
@@ -116,7 +126,8 @@ void testPreparation(void)
     system("rm -rf brothers_pid.txt");
 
     //kill all the app, which have a effect to the device
-    killallOtherApps(1);
+    killallBrotherApps(1);
+    killallOtherApps();
 #ifndef BOXV3_DEBUG_NET
     //start 4g establish monitor
     system("rm -rf /tmp/lte");
