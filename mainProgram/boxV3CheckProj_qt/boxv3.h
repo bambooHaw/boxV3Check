@@ -32,7 +32,7 @@ extern void testPreparation(void);
 
 #define BOXV3_SOFTWARE_FILEPATH "/run/sysversion"
 #define BOXV3_SOFTWARE_VERSION "BoxV3-Linux3.4.39"
-#define BOXV3CHECKAPP_VERSION "V3.1.2_2"
+#define BOXV3CHECKAPP_VERSION "V3.1.3"
 
 //bargun tmp file
 #define BOX_V3_BAR_CODE_TMP_FILE    "/run/boxv3/barCodeGun/signalCode.txt"
@@ -136,7 +136,7 @@ enum checkflag_enum
 #define BOXV3_SUB_VERSION   0x21
 
 #define BOXV3_FIRMWARE_PATH "/opt/mcufirmware"
-#define BOXV3_STM8BOOTAPP_FILEPATH "/usr/sbin/stm8boot"
+#define BOXV3_STM8BOOTAPP_FILEPATH "/opt/stm8boot"
 
 #define BOXV3_SHELL_FLASH_INIT_PART0 "/opt/flash_init.sh 0"
 #define BOXV3_SHELL_FLASH_INIT_PART1 "/opt/flash_init.sh 1"

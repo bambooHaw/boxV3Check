@@ -128,6 +128,10 @@ void testPreparation(void)
     //kill all the app, which have a effect to the device
     killallBrotherApps(1);
     killallOtherApps();
+
+    //enable some env interfase
+    system("chmod 777 /dev/swim");
+
 #ifndef BOXV3_DEBUG_NET
     //start 4g establish monitor
     system("rm -rf /tmp/lte");
